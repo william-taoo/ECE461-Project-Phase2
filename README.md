@@ -2,3 +2,4 @@
 
 ## Group Members:
 - Akash Kumar
+- Alexis Haas
