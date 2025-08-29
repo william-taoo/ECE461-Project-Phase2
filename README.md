@@ -2,5 +2,3 @@
 
 ## Group Members:
 - Akash Kumar
-- Alexis Haas
-- Ishana Thakre
