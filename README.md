@@ -1,4 +1,4 @@
-# ECE461Project
+# ECE461 Project
 
 ## Group Members:
 - Akash Kumar
