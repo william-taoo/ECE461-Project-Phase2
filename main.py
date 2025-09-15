@@ -1,12 +1,13 @@
 import sys
+from pathlib import Path
 from URL_handler import URLHandler
+from CLI_parser import read_urls
 
 def main():
-    #TODO get URLs from command line arguments
     url_file_path = sys.argv[1]
 
-    with open(url_file_path, 'r') as f:
-        urls = f.readlines()
+    # Read and clean URLs from filepath given in command line argument
+    urls = read_urls(Path(url_file_path))
 
     # Process URLs and create Model objects
     models = URLHandler.process_urls(urls)
