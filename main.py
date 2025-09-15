@@ -1,14 +1,20 @@
-from CustomObjects import Model
+import sys
+from URL_handler import URLHandler
 
 def main():
     #TODO get URLs from command line arguments
-    model_url = "http://example.com/model"
-    dataset_url = "http://example.com/dataset"
-    code_url = "http://example.com/code"
+    url_file_path = sys.argv[1]
 
-    model = Model(model_url, dataset_url, code_url)
-    model.compute_net_score()
-    print(f"Net Score: {model.net_score}")
+    with open(url_file_path, 'r') as f:
+        urls = f.readlines()
+
+    # Process URLs and create Model objects
+    models = URLHandler.process_urls(urls)
+
+    # Compute scores and print output for each model
+    for model in models:
+        model.compute_net_score()
+        print(f"URL: {model.url}, Net Score: {model.net_score:.2f}")
 
 
 if __name__ == "__main__":
