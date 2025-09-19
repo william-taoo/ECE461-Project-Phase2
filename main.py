@@ -18,9 +18,7 @@ def main():
 
     # Compute scores and print output for each model
     for model in models:
-        print(model.get_ramp_up_time())
-        # model.compute_net_score()
-        # print(f"URL: {model.url}, Net Score: {model.net_score:.2f}")
+        print(f"URL: {model.url}, Net Score: {model.net_score:.2f}")
 
 
 if __name__ == "__main__":
