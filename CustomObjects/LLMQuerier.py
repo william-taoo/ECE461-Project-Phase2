@@ -12,18 +12,13 @@ class LLMQuerier:
 
     def query(self, prompt, max_new_tokens=512, top_p=0.9, temperature=0.6):
         payload = {
-            "inputs": [
-                [
-                    {"role": "user", "content": prompt}
-                ]
-            ],
+            "inputs": prompt,
             "parameters": {
-                "max_new_tokens": max_new_tokens,
-                "top_p": top_p,
-                "temperature": temperature,
-                "return_full_text": False
+                "max_new_tokens": 100,
+                "temperature": 0.7
             }
         }
+
 
         try:
             payload_str = json.dumps(payload)
@@ -32,8 +27,15 @@ class LLMQuerier:
                 ContentType="application/json",
                 Body=payload_str,
             )
-            result = json.loads(response["Body"].read().decode())
-            return result[0]["generation"]["content"].strip()
+            
+            response_str = response["Body"].read().decode()
+            # The response from the model is a JSON string within a JSON object.
+            # We need to parse it twice.
+
+            result = json.loads(response_str)
+            
+            # The actual model output is in the 'generation' field of the first item.
+            return result["generated_text"].strip().split("\n")[0]
         except Exception as e:
             print(f"An error occurred: {e}")
             return None

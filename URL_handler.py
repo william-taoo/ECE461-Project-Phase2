@@ -29,6 +29,12 @@ class URLHandler:
 
             if URLHandler.is_github_url(url):
                 current_code_url = url
+                model = Model(
+                    model_url=url,
+                    dataset_url=current_dataset_url,
+                    code_url=current_code_url
+                )
+                models.append(model)
             elif URLHandler.is_huggingface_dataset(url):
                 current_dataset_url = url
             elif URLHandler.is_huggingface_model(url):

@@ -50,13 +50,17 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        llm_querier = LLMQuerier(endpoint_name="llm-461-model-endpoint-0213947", aws_region="us-east-2")
+        llm_querier = LLMQuerier(endpoint_name="jumpstart-dft-meta-textgeneration-l-20250919-201634", aws_region="us-east-2")
         prompt = (
             f"Assess the ramp-up time for using the model located at {self.url}. Provide a score between 0 (very difficult) and 1 (very easy). "
             "Ramp up time refers to the time required for a new user to become productive with the model."
             "Calculate ramp-up time based on factors such as documentation quality and clarity, community support, and complexity of the model."
+            "Provide only the numeric score as output, without any additional text or explanation."
         )
-        response = llm_querier.query(prompt=prompt, temperature=0.2)
+        response = llm_querier.query(prompt=prompt)
+
+        if response is None:
+            return 0.0
 
         return float(response)
     
