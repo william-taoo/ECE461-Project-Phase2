@@ -10,12 +10,12 @@ class LLMQuerier:
             region_name=self.aws_region
         )
 
-    def query(self, prompt, max_new_tokens=512, top_p=0.9, temperature=0.6):
+    def query(self, prompt, max_new_tokens=100, temperature=0.7):
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 100,
-                "temperature": 0.7
+                "max_new_tokens": max_new_tokens,
+                "temperature": temperature
             }
         }
 
