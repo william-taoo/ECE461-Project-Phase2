@@ -2,5 +2,3 @@ pytest
 requests
 beautifulsoup4
 gitpython
-boto3
-gitpython

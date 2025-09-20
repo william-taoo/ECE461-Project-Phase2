@@ -50,7 +50,7 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        llm_querier = LLMQuerier(endpoint_name="jumpstart-dft-meta-textgeneration-l-20250919-201634", aws_region="us-east-2")
+        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="sk-9ea412b294cf414aa6cc770031b1749d")
         prompt = (
             f"Assess the ramp-up time for using the model located at {self.url}. Provide a score between 0 (very difficult) and 1 (very easy). "
             "Ramp up time refers to the time required for a new user to become productive with the model."
