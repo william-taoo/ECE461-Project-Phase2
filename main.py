@@ -8,14 +8,20 @@ def main():
 
     # Read and clean URLs from filepath given in command line argument
     urls = read_urls(Path(url_file_path))
+    
+    # for debugging
+    # print(urls)
 
     # Process URLs and create Model objects
     models = URLHandler.process_urls(urls)
 
+    # for debugging
+    # print(models)
+
     # Compute scores and print output for each model
     for model in models:
-        model.compute_net_score()
-        print(f"URL: {model.url}, Net Score: {model.net_score:.2f}")
+        print(model.get_ramp_up_time())
+        # print(f"URL: {model.url}, Net Score: {model.net_score:.2f}")
 
 
 if __name__ == "__main__":

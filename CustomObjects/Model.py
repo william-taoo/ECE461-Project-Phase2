@@ -1,48 +1,142 @@
 import concurrent.futures
+from typing import Dict
 from CustomObjects.Dataset import Dataset
 from CustomObjects.Code import Code
+from CustomObjects.LLMQuerier import LLMQuerier
+import git
+import tempfile
+from collections import Counter
+from datetime import datetime, timedelta
 
 class Model:
-    def __init__(self, model_url, dataset_url, code_url):
+    url: str
+    size: float
+    license: float
+    ramp_up_time: float
+    bus_factor: float
+    dataset: Dataset
+    code: Code
+    performance_claims: float
+    net_score: float
+
+    def __init__(self, model_url: str, dataset_url: str, code_url: str) -> None:
         self.url = model_url
-        self.size = 0
-        self.license = ""
-        self.ramp_up_time = 0
-        self.bus_factor = 0
+        self.size = 0.0
+        self.license = 0.0
+        self.ramp_up_time = 0.0
+        self.bus_factor = 0.0
         self.dataset = Dataset(dataset_url) #Contains dataset quality and availability scores
         self.code = Code(code_url) #Contains code quality and availability scores
-        self.performance_claims = 0
-        self.net_score = 0
+        self.performance_claims = 0.0
+        self.net_score = 0.0
 
-    def get_size(self):
+    def get_size(self) -> float:
         #TODO implement size assessment logic
-        return 1
+        return 1.0
     
-    def get_license(self):
+    def get_license(self) -> float:
         #TODO implement license assessment logic
-        return 1
+        return 1.0
     
-    def get_ramp_up_time(self):
-        #TODO implement ramp up time assessment logic
-        return 1
+    def get_ramp_up_time(self) -> float:
+        """
+        Calculates the ramp up time for a given hugging face model.
+
+        The ramp up time is scored on a scale of 0.0 to 1.0, where 1.0 indicates
+        that the model is very easy to get started with, and 0.0 indicates that the model 
+        is very difficult to get started using.        
+
+        Returns:
+            A float score between 0.0 and 1.0. Returns 0.0 if the repository
+            cannot be cloned or has no recent commits.
+        """
+        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="{insert_api_key_here}")
+        prompt = (
+            f"Assess the ramp-up time for using the model located at {self.url}. Provide a score between 0 (very difficult) and 1 (very easy). "
+            "Ramp up time refers to the time required for a new user to become productive with the model."
+            "Calculate ramp-up time based on factors such as documentation quality and clarity, community support, and complexity of the model."
+            "Provide only the numeric score as output, without any additional text or explanation."
+        )
+        response = llm_querier.query(prompt=prompt)
+
+        if response is None:
+            return 0.0
+
+        return float(response)
     
-    def get_bus_factor(self):
-        #TODO implement bus factor assessment logic
-        return 1
+    def get_bus_factor(self) -> float:
+        """
+        Calculates the bus factor for a given Git repository.
+
+        The bus factor is scored on a scale of 0.0 to 1.0. It is based on the
+        number of "significant authors" (those with >5% of commits in the last
+        year). A score of 1.0 is achieved if there are 5 or more such authors.
+
+        Returns:
+            A float score between 0.0 and 1.0. Returns 0.0 if the repository
+            cannot be cloned or has no recent commits.
+        """
+        print(f"Analyzing repository: {self.url}...")
+        
+        # Use a temporary directory that will be automatically cleaned up
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                # 1. Programmatically clone the repository
+                print(f"Cloning into temporary directory: {temp_dir}")
+                repo = git.Repo.clone_from(self.url, temp_dir, depth=None) # Use depth=None to get full history
+                
+                # 2. Define the time window (last 365 days)
+                one_year_ago = datetime.now() - timedelta(days=365)
+                
+                # 3. Get authors of commits from the last year
+                recent_authors = [
+                    commit.author.name
+                    for commit in repo.iter_commits()
+                    if commit.committed_datetime.replace(tzinfo=None) > one_year_ago
+                ]
+                
+                # If no recent commits, the project is inactive.
+                if not recent_authors:
+                    print("No recent commits found in the last year.")
+                    return 0.0
+                    
+                total_commits = len(recent_authors)
+                print(f"Found {total_commits} commits in the last year.")
+                
+                # 4. Count commits per author
+                commit_counts = Counter(recent_authors)
+                
+                # 5. Identify significant authors (>5% of commits)
+                significant_authors_count = 0
+                for author, count in commit_counts.items():
+                    contribution_percentage = (count / total_commits) * 100
+                    if contribution_percentage > 5.0:
+                        significant_authors_count += 1
+                        print(f"  - Significant contributor: {author} ({count} commits, {contribution_percentage:.1f}%)")
+
+                # 6. Calculate the final score (capped at 1.0)
+                score = min(1.0, significant_authors_count / 20.0)
+
+                repo.close()
+                return score
+
+            except git.exc.GitCommandError as e:
+                print(f"Error cloning or analyzing repository: {e}")
+                return 0.0
     
-    def get_performance_claims(self):
+    def get_performance_claims(self) -> float:
         #TODO implement performance claims assessment logic
-        return 1
+        return 1.0
     
-    def compute_net_score(self):
+    def compute_net_score(self) -> float:
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_size = executor.submit(self.get_size)
-            future_license = executor.submit(self.get_license)
-            future_ramp_up_time = executor.submit(self.get_ramp_up_time)
-            future_bus_factor = executor.submit(self.get_bus_factor)
-            future_dataset_quality = executor.submit(self.dataset.get_quality)
-            future_code_quality = executor.submit(self.code.get_quality)
-            future_performance_claims = executor.submit(self.get_performance_claims)
+            future_size: concurrent.futures.Future[float] = executor.submit(self.get_size)
+            future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
+            future_ramp_up_time: concurrent.futures.Future[float] = executor.submit(self.get_ramp_up_time)
+            future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
+            future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality)
+            future_code_quality: concurrent.futures.Future[float] = executor.submit(self.code.get_quality)
+            future_performance_claims: concurrent.futures.Future[float] = executor.submit(self.get_performance_claims)
 
             self.size = future_size.result()
             self.license = future_license.result()
@@ -53,7 +147,7 @@ class Model:
             self.performance_claims = future_performance_claims.result()
 
         # Example weights, can be adjusted based on importance
-        weights = {
+        weights: Dict[str, float] = {
             'license': 0.25,
             'ramp_up_time': 0.05,
             'bus_factor': 0.15,
