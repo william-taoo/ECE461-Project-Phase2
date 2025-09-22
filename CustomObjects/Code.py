@@ -16,7 +16,7 @@ class Code:
         self.quality: float = 0.0  # filled by get_quality()
 
     def count_python_loc(self, root: str) -> int:
-        """Count total lines across all .py files under root (simple LOC)."""
+        """Count total lines across all .py files under root."""
         total = 0
         for dirpath, _, filenames in os.walk(root):
             for name in filenames:

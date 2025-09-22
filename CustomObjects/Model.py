@@ -1,5 +1,5 @@
 import concurrent.futures
-from typing import Dict, Optional
+from typing import Dict
 from CustomObjects.Dataset import Dataset
 from CustomObjects.Code import Code
 from CustomObjects.LLMQuerier import LLMQuerier
@@ -7,10 +7,8 @@ import git
 import tempfile
 from collections import Counter
 from datetime import datetime, timedelta
-import os
 import re
 from huggingface_hub import HfApi
-from huggingface_hub.utils import HfHubHTTPError
 from urllib.parse import urlparse
 
 class Model:
@@ -156,14 +154,14 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        print(f"Analyzing repository: {self.url}...")
+        print(f"Analyzing repository: {self.code_url}...")
 
         # Use a temporary directory that will be automatically cleaned up
         with tempfile.TemporaryDirectory() as temp_dir:
             try:
                 # 1. Programmatically clone the repository
                 print(f"Cloning into temporary directory: {temp_dir}")
-                repo = git.Repo.clone_from(self.url, temp_dir, depth=None) # Use depth=None to get full history
+                repo = git.Repo.clone_from(self.code_url, temp_dir, depth=None) # Use depth=None to get full history
 
                 # 2. Define the time window (last 365 days)
                 one_year_ago = datetime.now() - timedelta(days=365)
@@ -238,7 +236,7 @@ class Model:
             future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)
             future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
             future_ramp_up_time: concurrent.futures.Future[float] = executor.submit(self.get_ramp_up_time)
-            future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
+            # future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
             future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality)
             future_code_quality: concurrent.futures.Future[float] = executor.submit(self.code.get_quality)
             future_performance_claims: concurrent.futures.Future[float] = executor.submit(self.get_performance_claims)
@@ -246,7 +244,7 @@ class Model:
             self.size_score = future_size.result()
             self.license = future_license.result()
             self.ramp_up_time = future_ramp_up_time.result()
-            self.bus_factor = future_bus_factor.result()
+            # self.bus_factor = future_bus_factor.result()
             self.dataset.quality = future_dataset_quality.result()
             self.code.quality = future_code_quality.result()
             self.performance_claims = future_performance_claims.result()
@@ -255,7 +253,7 @@ class Model:
         weights: Dict[str, float] = {
             'license': 0.25,
             'ramp_up_time': 0.05,
-            'bus_factor': 0.15,
+            # 'bus_factor': 0.15,
             'dataset_quality': 0.195,
             'dataset_availability': 0.025,
             'code_quality': 0.005,
@@ -266,7 +264,7 @@ class Model:
         self.net_score = (
             weights['license'] * self.license +
             weights['ramp_up_time'] * self.ramp_up_time +
-            weights['bus_factor'] * self.bus_factor +
+            # weights['bus_factor'] * self.bus_factor +
             weights['dataset_quality'] * self.dataset.quality +
             weights['dataset_availability'] * self.dataset.dataset_availability +
             weights['code_quality'] * self.code.quality +
