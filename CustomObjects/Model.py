@@ -205,8 +205,33 @@ class Model:
                 return 0.0
 
     def get_performance_claims(self) -> float:
-        #TODO implement performance claims assessment logic
-        return 1.0
+        """
+        Calculates the performance-claims score for the model.
+
+        Score is a single float in [0,1] returned by the LLM.
+        The LLM is given the model URL and ask for a numeric-only assessment of how well
+        performance/evaluation/benchmarks are documented.
+        """
+        llm_querier = LLMQuerier(
+            endpoint="https://genai.rcac.purdue.edu/api/chat/completions",
+            api_key="sk-bed2e8c43f1a4e538f4b66501ede6b0b",
+        )
+        prompt = (
+            f"Assess the performance documentation for the model located at {self.url}. "
+            "Provide a score between 0 (no documentation) and 1 (clear, detailed documentation). "
+            "Performance documentation refers to evaluation results, benchmarks, or metrics reported in the README. "
+            "Provide only the numeric score as output, without any additional text or explanation."
+        )
+        response = llm_querier.query(prompt=prompt)
+
+        if response is None:
+            return 0.0
+
+        try:
+            return max(0.0, min(1.0, float(response)))
+        except Exception:
+            return 0.0
+
 
     def compute_net_score(self) -> float:
         with concurrent.futures.ThreadPoolExecutor() as executor:

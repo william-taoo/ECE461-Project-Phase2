@@ -1,6 +1,3 @@
-# CustomObjects/Dataset.py
-from __future__ import annotations
-
 from typing import Optional
 from urllib.parse import urlparse
 from huggingface_hub import HfApi
@@ -15,6 +12,7 @@ class Dataset:
         self.model_url = model_url
         # availability: URL present -> 1.0, else 0.0
         self.dataset_availability: float = 1.0 if dataset_url else 0.0
+        # ^^ might need to change this later to parse README or files for reference to a dataset instead of relying on url
         self.quality: float = 0.0  # filled by get_quality()
 
     def hf_popularity_score(self, repo_id: str) -> float:
