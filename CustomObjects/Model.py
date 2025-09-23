@@ -236,7 +236,7 @@ class Model:
             future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)
             future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
             future_ramp_up_time: concurrent.futures.Future[float] = executor.submit(self.get_ramp_up_time)
-            # future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
+            future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
             future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality)
             future_code_quality: concurrent.futures.Future[float] = executor.submit(self.code.get_quality)
             future_performance_claims: concurrent.futures.Future[float] = executor.submit(self.get_performance_claims)
@@ -244,7 +244,7 @@ class Model:
             self.size_score = future_size.result()
             self.license = future_license.result()
             self.ramp_up_time = future_ramp_up_time.result()
-            # self.bus_factor = future_bus_factor.result()
+            self.bus_factor = future_bus_factor.result()
             self.dataset.quality = future_dataset_quality.result()
             self.code.quality = future_code_quality.result()
             self.performance_claims = future_performance_claims.result()
@@ -253,7 +253,7 @@ class Model:
         weights: Dict[str, float] = {
             'license': 0.25,
             'ramp_up_time': 0.05,
-            # 'bus_factor': 0.15,
+            'bus_factor': 0.15,
             'dataset_quality': 0.195,
             'dataset_availability': 0.025,
             'code_quality': 0.005,
@@ -264,7 +264,7 @@ class Model:
         self.net_score = (
             weights['license'] * self.license +
             weights['ramp_up_time'] * self.ramp_up_time +
-            # weights['bus_factor'] * self.bus_factor +
+            weights['bus_factor'] * self.bus_factor +
             weights['dataset_quality'] * self.dataset.quality +
             weights['dataset_availability'] * self.dataset.dataset_availability +
             weights['code_quality'] * self.code.quality +
