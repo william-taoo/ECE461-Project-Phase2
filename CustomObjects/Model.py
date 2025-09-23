@@ -1,5 +1,5 @@
 import concurrent.futures
-from typing import Dict, Optional
+from typing import Dict
 from CustomObjects.Dataset import Dataset
 from CustomObjects.Code import Code
 from CustomObjects.LLMQuerier import LLMQuerier
@@ -7,10 +7,8 @@ import git
 import tempfile
 from collections import Counter
 from datetime import datetime, timedelta
-import os
 import re
 from huggingface_hub import HfApi
-from huggingface_hub.utils import HfHubHTTPError
 from urllib.parse import urlparse
 
 class Model:
@@ -26,11 +24,13 @@ class Model:
 
     def __init__(self, model_url: str, dataset_url: str, code_url: str) -> None:
         self.url = model_url
+        self.dataset_url = dataset_url
+        self.code_url = code_url
         self.size_score = {}
         self.license = 0.0
         self.ramp_up_time = 0.0
         self.bus_factor = 0.0
-        self.dataset = Dataset(dataset_url) #Contains dataset quality and availability scores
+        self.dataset = Dataset(dataset_url, model_url) #Contains dataset quality and availability scores
         self.code = Code(code_url) #Contains code quality and availability scores
         self.performance_claims = 0.0
         self.net_score = 0.0
@@ -45,7 +45,7 @@ class Model:
         scores: Dict[str, float] = {}
 
         try:
-            # Parse the URL to get the repository ID 
+            # Parse the URL to get the repository ID
             path_parts = urlparse(self.url).path.strip('/').split('/')
             if len(path_parts) < 2:
                 return {}
@@ -63,46 +63,47 @@ class Model:
                 if device == 'aws_server':
                     scores[device] = 1.0
                     continue
-                
+
                 if total_size <= threshold:
                     scores[device] = 1.0
                 else:
                     # Score decreases linearly to 0 as size approaches 2*threshold
                     score = (2 * threshold - total_size) / threshold
                     scores[device] = max(0.0, score)
-            
+
             return scores
         except Exception as e:
             print(f"An unexpected error occurred while fetching the model size: {e}")
             return {}
-    
-    
+
+
     def get_license(self) -> float:
         compatible_licenses = ['mit', 'bsd', 'lgpl']
-        
+
         # Parse the URL to get the repository ID
         path_parts = urlparse(self.url).path.strip('/').split('/')
         if len(path_parts) < 2:
             return 0.0
         repo_id = f"{path_parts[0]}/{path_parts[1]}"
-        
+
         # Use the HfApi to fetch only the README file
         api = HfApi()
         readme_filepath = api.hf_hub_download(repo_id=repo_id, filename="README.md")
         with open(readme_filepath, 'r', encoding='utf-8') as f:
             readme_content = f.read()
-            print(readme_content)
+            # for debugging
+            # print(readme_content)
 
         # Find the 'License' section in the fetched content
         match = re.search(r'^#+\s*license\s*$', readme_content, re.IGNORECASE | re.MULTILINE)
-        
+
         if not match:
             print("No license section found in README.")
             return 0.0
 
         start_index = match.end()
         next_heading_match = re.search(r'^#+', readme_content[start_index:], re.MULTILINE)
-        
+
         if next_heading_match:
             end_index = start_index + next_heading_match.start()
             license_text = readme_content[start_index:end_index].lower()
@@ -112,16 +113,16 @@ class Model:
         for lic in compatible_licenses:
             if lic in license_text:
                 return 1.0
-                
+
         return 0.0
-    
+
     def get_ramp_up_time(self) -> float:
         """
         Calculates the ramp up time for a given hugging face model.
 
         The ramp up time is scored on a scale of 0.0 to 1.0, where 1.0 indicates
-        that the model is very easy to get started with, and 0.0 indicates that the model 
-        is very difficult to get started using.        
+        that the model is very easy to get started with, and 0.0 indicates that the model
+        is very difficult to get started using.
 
         Returns:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
@@ -140,7 +141,7 @@ class Model:
             return 0.0
 
         return float(response)
-    
+
     def get_bus_factor(self) -> float:
         """
         Calculates the bus factor for a given Git repository.
@@ -153,36 +154,36 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        print(f"Analyzing repository: {self.url}...")
-        
+        print(f"Analyzing repository: {self.code_url}...")
+
         # Use a temporary directory that will be automatically cleaned up
         with tempfile.TemporaryDirectory() as temp_dir:
             try:
                 # 1. Programmatically clone the repository
                 print(f"Cloning into temporary directory: {temp_dir}")
-                repo = git.Repo.clone_from(self.url, temp_dir, depth=None) # Use depth=None to get full history
-                
+                repo = git.Repo.clone_from(self.code_url, temp_dir, depth=None) # Use depth=None to get full history
+
                 # 2. Define the time window (last 365 days)
                 one_year_ago = datetime.now() - timedelta(days=365)
-                
+
                 # 3. Get authors of commits from the last year
                 recent_authors = [
                     commit.author.name
                     for commit in repo.iter_commits()
                     if commit.committed_datetime.replace(tzinfo=None) > one_year_ago
                 ]
-                
+
                 # If no recent commits, the project is inactive.
                 if not recent_authors:
                     print("No recent commits found in the last year.")
                     return 0.0
-                    
+
                 total_commits = len(recent_authors)
                 print(f"Found {total_commits} commits in the last year.")
-                
+
                 # 4. Count commits per author
                 commit_counts = Counter(recent_authors)
-                
+
                 # 5. Identify significant authors (>5% of commits)
                 significant_authors_count = 0
                 for author, count in commit_counts.items():
@@ -200,11 +201,36 @@ class Model:
             except git.exc.GitCommandError as e:
                 print(f"Error cloning or analyzing repository: {e}")
                 return 0.0
-    
+
     def get_performance_claims(self) -> float:
-        #TODO implement performance claims assessment logic
-        return 1.0
-    
+        """
+        Calculates the performance-claims score for the model.
+
+        Score is a single float in [0,1] returned by the LLM.
+        The LLM is given the model URL and ask for a numeric-only assessment of how well
+        performance/evaluation/benchmarks are documented.
+        """
+        llm_querier = LLMQuerier(
+            endpoint="https://genai.rcac.purdue.edu/api/chat/completions",
+            api_key="YOUR_API_KEY_HERE",
+        )
+        prompt = (
+            f"Assess the performance documentation for the model located at {self.url}. "
+            "Provide a score between 0 (no documentation) and 1 (clear, detailed documentation). "
+            "Performance documentation refers to evaluation results, benchmarks, or metrics reported in the README. "
+            "Provide only the numeric score as output, without any additional text or explanation."
+        )
+        response = llm_querier.query(prompt=prompt)
+
+        if response is None:
+            return 0.0
+
+        try:
+            return max(0.0, min(1.0, float(response)))
+        except Exception:
+            return 0.0
+
+
     def compute_net_score(self) -> float:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)

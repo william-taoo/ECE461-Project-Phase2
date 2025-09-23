@@ -8,7 +8,7 @@ def main():
 
     # Read and clean URLs from filepath given in command line argument
     urls = read_urls(Path(url_file_path))
-    
+
     # for debugging
     # print(urls)
 
@@ -18,12 +18,20 @@ def main():
     # for debugging
     # print(models)
 
-    # Compute scores and print output for each model
+    # Compute code quality scores and print output for each model
     for model in models:
-        print(model.get_size())
-        
-        # print(f"URL: {model.url}, Net Score: {model.net_score:.2f}")
-
+        score = model.compute_net_score()
+        print(f"Model: {model.url}")
+        print(f"  Size score: {model.size_score}")
+        print(f"  License: {model.license}")
+        print(f"  Ramp-up time: {model.ramp_up_time}")
+        print(f"  Bus factor: {model.bus_factor}")
+        print(f"  Dataset quality: {model.dataset.quality}")
+        print(f"  Dataset availability: {model.dataset.dataset_availability}")
+        print(f"  Code quality: {model.code.quality}")
+        print(f"  Code availability: {model.code.code_availability}")
+        print(f"  Performance claims: {model.performance_claims}")
+        print(f"  Net score: {score}\n")
 
 if __name__ == "__main__":
     main()

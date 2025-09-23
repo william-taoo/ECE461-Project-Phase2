@@ -15,4 +15,6 @@ Run `python -m pytest` in the terminal to execute the test suite
 ## Running the application:
 python main.py .\tests\testInput.txt
 
-note: enter your own api key in Model.py file at line 53
+note: enter your own api key in the following places:
+- Model.py file at line 130 and 217
+- Dataset.py line 109
