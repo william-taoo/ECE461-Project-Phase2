@@ -2,8 +2,18 @@ import sys
 from pathlib import Path
 from URL_handler import URLHandler
 from CLI_parser import read_urls
+from dotenv import load_dotenv
+import os
 
 def main():
+
+    # Load environment variables from .env file
+    load_dotenv()
+    api_key = os.getenv("API_KEY")
+
+    if not api_key:
+        raise ValueError("Error: API_KEY environment variable not set! Make sure it is in your .env file.")
+
     url_file_path = sys.argv[1]
 
     # Read and clean URLs from filepath given in command line argument
@@ -20,7 +30,7 @@ def main():
 
     # Compute code quality scores and print output for each model
     for model in models:
-        score = model.compute_net_score()
+        score = model.compute_net_score(api_key=api_key)
         print(f"Model: {model.url}")
         print(f"  Size score: {model.size_score}")
         print(f"  License: {model.license}")

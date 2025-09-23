@@ -3,12 +3,10 @@ from typing import Dict
 from CustomObjects.Dataset import Dataset
 from CustomObjects.Code import Code
 from CustomObjects.LLMQuerier import LLMQuerier
-import git
-import tempfile
 from collections import Counter
 from datetime import datetime, timedelta
 import re
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, list_repo_commits
 from urllib.parse import urlparse
 
 class Model:
@@ -91,14 +89,11 @@ class Model:
         readme_filepath = api.hf_hub_download(repo_id=repo_id, filename="README.md")
         with open(readme_filepath, 'r', encoding='utf-8') as f:
             readme_content = f.read()
-            # for debugging
-            # print(readme_content)
 
         # Find the 'License' section in the fetched content
         match = re.search(r'^#+\s*license\s*$', readme_content, re.IGNORECASE | re.MULTILINE)
 
         if not match:
-            print("No license section found in README.")
             return 0.0
 
         start_index = match.end()
@@ -116,7 +111,7 @@ class Model:
 
         return 0.0
 
-    def get_ramp_up_time(self) -> float:
+    def get_ramp_up_time(self, api_key) -> float:
         """
         Calculates the ramp up time for a given hugging face model.
 
@@ -128,7 +123,7 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="YOUR_API_KEY_HERE")
+        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key=api_key)
         prompt = (
             f"Assess the ramp-up time for using the model located at {self.url}. Provide a score between 0 (very difficult) and 1 (very easy). "
             "Ramp up time refers to the time required for a new user to become productive with the model."
@@ -154,53 +149,51 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        print(f"Analyzing repository: {self.code_url}...")
+        print(f"Analyzing repository: {self.url}...")
 
-        # Use a temporary directory that will be automatically cleaned up
-        with tempfile.TemporaryDirectory() as temp_dir:
-            try:
-                # 1. Programmatically clone the repository
-                print(f"Cloning into temporary directory: {temp_dir}")
-                repo = git.Repo.clone_from(self.code_url, temp_dir, depth=None) # Use depth=None to get full history
+        # Parse the URL to get the repository ID
+        path_parts = urlparse(self.url).path.strip('/').split('/')
+        if len(path_parts) < 2:
+            return {}
+        repo_id = f"{path_parts[0]}/{path_parts[1]}"
 
-                # 2. Define the time window (last 365 days)
-                one_year_ago = datetime.now() - timedelta(days=365)
-
-                # 3. Get authors of commits from the last year
-                recent_authors = [
-                    commit.author.name
-                    for commit in repo.iter_commits()
-                    if commit.committed_datetime.replace(tzinfo=None) > one_year_ago
-                ]
-
-                # If no recent commits, the project is inactive.
-                if not recent_authors:
-                    print("No recent commits found in the last year.")
-                    return 0.0
-
-                total_commits = len(recent_authors)
-                print(f"Found {total_commits} commits in the last year.")
-
-                # 4. Count commits per author
-                commit_counts = Counter(recent_authors)
-
-                # 5. Identify significant authors (>5% of commits)
-                significant_authors_count = 0
-                for author, count in commit_counts.items():
-                    contribution_percentage = (count / total_commits) * 100
-                    if contribution_percentage > 5.0:
-                        significant_authors_count += 1
-                        print(f"  - Significant contributor: {author} ({count} commits, {contribution_percentage:.1f}%)")
-
-                # 6. Calculate the final score (capped at 1.0)
-                score = min(1.0, significant_authors_count / 20.0)
-
-                repo.close()
-                return score
-
-            except git.exc.GitCommandError as e:
-                print(f"Error cloning or analyzing repository: {e}")
+        try:
+            # 1. Instantiate the API client and fetch commits
+            api = HfApi()
+            commits = list_repo_commits(repo_id=repo_id)
+            
+            # 2. Define the time window (last 365 days)
+            years = 2
+            year_limit = datetime.now().astimezone() - timedelta(days=365*2)
+            
+            # 3. Filter commits from the last year and get author names
+            recent_authors = []
+            for commit in commits:
+                if commit.created_at > year_limit:
+                    for author in commit.authors:
+                        recent_authors.append(author)
+            
+            if not recent_authors:
                 return 0.0
+                
+            total_commits = len(recent_authors)
+            
+            # 4. Count commits per author
+            commit_counts = Counter(recent_authors)
+            
+            # 5. Identify significant authors (>5% of commits)
+            significant_authors_count = 0
+            for author, count in commit_counts.items():
+                contribution_percentage = (count / total_commits) * 100
+                if contribution_percentage > 5.0:
+                    significant_authors_count += 1
+
+            # 6. Calculate the final score (capped at 1.0)
+            score = min(1.0, significant_authors_count / 20.0)
+            return score
+        
+        except Exception as e:
+            return 0.0
 
     def get_performance_claims(self) -> float:
         """
@@ -231,11 +224,11 @@ class Model:
             return 0.0
 
 
-    def compute_net_score(self) -> float:
+    def compute_net_score(self, api_key) -> float:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)
             future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
-            future_ramp_up_time: concurrent.futures.Future[float] = executor.submit(self.get_ramp_up_time)
+            future_ramp_up_time: concurrent.futures.Future[float] = executor.submit(self.get_ramp_up_time, api_key=api_key)
             future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
             future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality)
             future_code_quality: concurrent.futures.Future[float] = executor.submit(self.code.get_quality)
