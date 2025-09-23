@@ -19,18 +19,13 @@ def main():
     # print(models)
 
     # Compute code quality scores and print output for each model
-def main():
-    url_file_path = sys.argv[1]
-    urls = read_urls(Path(url_file_path))
-    models = URLHandler.process_urls(urls)
-
     for model in models:
         score = model.compute_net_score()
         print(f"Model: {model.url}")
         print(f"  Size score: {model.size_score}")
         print(f"  License: {model.license}")
         print(f"  Ramp-up time: {model.ramp_up_time}")
-        print(f"  Bus factor: {model.bus_factor}")
+        # print(f"  Bus factor: {model.bus_factor}")
         print(f"  Dataset quality: {model.dataset.quality}")
         print(f"  Dataset availability: {model.dataset.dataset_availability}")
         print(f"  Code quality: {model.code.quality}")

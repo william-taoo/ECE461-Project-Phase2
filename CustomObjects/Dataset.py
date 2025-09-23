@@ -11,9 +11,10 @@ class Dataset:
         self.dataset_url = dataset_url
         self.model_url = model_url
         # availability: URL present -> 1.0, else 0.0
+        # might need to change this later to parse README or files for reference to a dataset instead of relying on url
         self.dataset_availability: float = 1.0 if dataset_url else 0.0
-        # ^^ might need to change this later to parse README or files for reference to a dataset instead of relying on url
         self.quality: float = 0.0  # filled by get_quality()
+
 
     def hf_popularity_score(self, repo_id: str) -> float:
         """
@@ -49,7 +50,6 @@ class Dataset:
         like_score = 0.0 if like_baseline <= 0 else max(
             0.0, min(1.0, math.log1p(max(0.0, float(likes))) / math.log1p(float(like_baseline)))
         ) if likes > 0 else 0.0
-
 
         return float(dnld_weight * dl_score + like_weight * like_score)
 
@@ -104,7 +104,7 @@ class Dataset:
         Use LLM to score dataset quality from the README snippet.
         Returns float in [0,1] or None.
         """
-        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="sk-bed2e8c43f1a4e538f4b66501ede6b0b")
+        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="YOUR_API_KEY_HERE")
         prompt = (
             "Assess the quality of the dataset used to train this model. "
             "Provide a score between 0 (very low quality) and 1 (very high quality). "
@@ -120,9 +120,6 @@ class Dataset:
 
         return float(response)
 
-    # -------------------------
-    # Public: compute quality
-    # -------------------------
     def get_quality(self) -> float:
         """
         Calculate dataset_quality score from two metrics:
@@ -151,7 +148,7 @@ class Dataset:
             if section:
                 llm_score = self.score_with_llm(section)
 
-        # Combine (simple and explicit)
+        # Combine
         if llm_score is not None and popularity_score is not None:
             self.quality = float(0.5 * llm_score + 0.5 * popularity_score)
         elif llm_score is not None:

@@ -11,9 +11,9 @@ class Code:
     def __init__(self, code_url) -> None:
         self.code_url = code_url
         # availability: URL present -> 1.0, else 0.0
+        # might need to change this later to parse README or files for reference to a dataset instead of relying on url
         self.code_availability: float = 1.0 if code_url else 0.0
-        # ^^ might need to change this later to parse README or files for reference to a dataset instead of relying on url
-        self.quality: float = 0.0  # filled by get_quality()
+        self.quality: float = 0.0
 
     def count_python_loc(self, root: str) -> int:
         """Count total lines across all .py files under root."""

@@ -128,7 +128,7 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="sk-bed2e8c43f1a4e538f4b66501ede6b0b")
+        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="YOUR_API_KEY_HERE")
         prompt = (
             f"Assess the ramp-up time for using the model located at {self.url}. Provide a score between 0 (very difficult) and 1 (very easy). "
             "Ramp up time refers to the time required for a new user to become productive with the model."
@@ -212,7 +212,7 @@ class Model:
         """
         llm_querier = LLMQuerier(
             endpoint="https://genai.rcac.purdue.edu/api/chat/completions",
-            api_key="sk-bed2e8c43f1a4e538f4b66501ede6b0b",
+            api_key="YOUR_API_KEY_HERE",
         )
         prompt = (
             f"Assess the performance documentation for the model located at {self.url}. "
