@@ -15,6 +15,5 @@ Run `python -m pytest` in the terminal to execute the test suite
 ## Running the application:
 python main.py .\tests\testInput.txt
 
-note: enter your own api key in the following places:
-- Model.py file at line 130 and 217
-- Dataset.py line 109
+note: Make sure to set your API key in a .env file in the root directory with the line: (the .env file is included in .gitignore)
+API_KEY="your_api_key_here"

@@ -2,3 +2,6 @@ pytest
 requests
 beautifulsoup4
 gitpython
+huggingface_hub
+flake8
+python-dotenv
