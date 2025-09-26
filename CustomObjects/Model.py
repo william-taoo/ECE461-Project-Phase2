@@ -230,7 +230,7 @@ class Model:
             future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
             future_ramp_up_time: concurrent.futures.Future[float] = executor.submit(self.get_ramp_up_time, api_key=api_key)
             future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
-            future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality)
+            future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality, api_key=api_key)
             future_code_quality: concurrent.futures.Future[float] = executor.submit(self.code.get_quality)
             future_performance_claims: concurrent.futures.Future[float] = executor.submit(self.get_performance_claims)
 
