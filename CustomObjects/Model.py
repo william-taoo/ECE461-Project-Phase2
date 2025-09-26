@@ -111,7 +111,7 @@ class Model:
 
         return 0.0
 
-    def get_ramp_up_time(self, api_key) -> float:
+    def get_ramp_up_time(self, api_key: str) -> float:
         """
         Calculates the ramp up time for a given hugging face model.
 
@@ -197,7 +197,7 @@ class Model:
         except Exception as e:
             return 0.0
 
-    def get_performance_claims(self, api_key) -> float:
+    def get_performance_claims(self, api_key: str) -> float:
         """
         Calculates the performance-claims score for the model.
 
@@ -226,7 +226,7 @@ class Model:
             return 0.0
 
 
-    def compute_net_score(self, api_key) -> float:
+    def compute_net_score(self, api_key: str) -> float:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)
             future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
