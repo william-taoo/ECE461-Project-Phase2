@@ -26,8 +26,8 @@ def test_process_urls_full_set():
     models = URLHandler.process_urls(urls)
     assert len(models) == 1
     assert models[0].url == "https://huggingface.co/google/gemma-3-270m/tree/main"
-    assert models[0].dataset.url == "https://huggingface.co/datasets/xlangai/AgentNet"
-    assert models[0].code.url == "https://github.com/SkyworkAI/Matrix-Game"
+    assert models[0].dataset.dataset_url == "https://huggingface.co/datasets/xlangai/AgentNet"
+    assert models[0].code.code_url == "https://github.com/SkyworkAI/Matrix-Game"
 
 def test_process_urls_model_only():
     """Tests processing a list with only a model URL."""
@@ -35,5 +35,5 @@ def test_process_urls_model_only():
     models = URLHandler.process_urls(urls)
     assert len(models) == 1
     assert models[0].url == "https://huggingface.co/bert-base-uncased"
-    assert models[0].dataset.url is None
-    assert models[0].code.url is None
+    assert models[0].dataset.dataset_url is None
+    assert models[0].code.code_url is None
