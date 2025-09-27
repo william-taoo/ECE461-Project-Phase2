@@ -99,12 +99,12 @@ class Dataset:
         end = min(len(text), m.end() + 1200)
         return text[start:end]
 
-    def score_with_llm(self, section_text: str) -> Optional[float]:
+    def score_with_llm(self, section_text: str, api_key: str) -> Optional[float]:
         """
         Use LLM to score dataset quality from the README snippet.
         Returns float in [0,1] or None.
         """
-        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key="YOUR_API_KEY_HERE")
+        llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key=api_key)
         prompt = (
             "Assess the quality of the dataset used to train this model. "
             "Provide a score between 0 (very low quality) and 1 (very high quality). "
@@ -120,7 +120,7 @@ class Dataset:
 
         return float(response)
 
-    def get_quality(self) -> float:
+    def get_quality(self, api_key: str) -> float:
         """
         Calculate dataset_quality score from two metrics:
           1) Popularity (if self.dataset_url is an HF dataset)
@@ -146,7 +146,7 @@ class Dataset:
         if self.model_url:
             section = self.extract_training_data_info(self.model_url)
             if section:
-                llm_score = self.score_with_llm(section)
+                llm_score = self.score_with_llm(section, api_key)
 
         # Combine
         if llm_score is not None and popularity_score is not None:
