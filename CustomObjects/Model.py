@@ -111,7 +111,7 @@ class Model:
 
         return 0.0
 
-    def get_ramp_up_time(self, api_key) -> float:
+    def get_ramp_up_time(self, api_key: str) -> float:
         """
         Calculates the ramp up time for a given hugging face model.
 
@@ -181,21 +181,23 @@ class Model:
             # 4. Count commits per author
             commit_counts = Counter(recent_authors)
             
-            # 5. Identify significant authors (>5% of commits)
+            # 5. Identify significant authors (>4% of commits)
+            percent_of_commits = 4.0
             significant_authors_count = 0
             for author, count in commit_counts.items():
                 contribution_percentage = (count / total_commits) * 100
-                if contribution_percentage > 5.0:
+                if contribution_percentage > percent_of_commits:
                     significant_authors_count += 1
 
             # 6. Calculate the final score (capped at 1.0)
-            score = min(1.0, significant_authors_count / 20.0)
+            min_total_contributors = 10.0
+            score = min(1.0, significant_authors_count / min_total_contributors)
             return score
         
         except Exception as e:
             return 0.0
 
-    def get_performance_claims(self) -> float:
+    def get_performance_claims(self, api_key: str) -> float:
         """
         Calculates the performance-claims score for the model.
 
@@ -205,7 +207,7 @@ class Model:
         """
         llm_querier = LLMQuerier(
             endpoint="https://genai.rcac.purdue.edu/api/chat/completions",
-            api_key="YOUR_API_KEY_HERE",
+            api_key=api_key,
         )
         prompt = (
             f"Assess the performance documentation for the model located at {self.url}. "
@@ -224,7 +226,7 @@ class Model:
             return 0.0
 
 
-    def compute_net_score(self, api_key) -> float:
+    def compute_net_score(self, api_key: str) -> float:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)
             future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
@@ -232,7 +234,7 @@ class Model:
             future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
             future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality)
             future_code_quality: concurrent.futures.Future[float] = executor.submit(self.code.get_quality)
-            future_performance_claims: concurrent.futures.Future[float] = executor.submit(self.get_performance_claims)
+            future_performance_claims: concurrent.futures.Future[float] = executor.submit(self.get_performance_claims, api_key=api_key)
 
             self.size_score = future_size.result()
             self.license = future_license.result()

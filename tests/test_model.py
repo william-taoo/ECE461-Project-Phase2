@@ -35,7 +35,7 @@ def test_compute_net_score(model):
     expected_net_score = 0.25 + 0.05 + 0.15 + 0.195 + 0.025 + 0.005 + 0.025 + 0.30
     
     # Compute the net score
-    net_score = model.compute_net_score()
+    net_score = model.compute_net_score(api_key="dummy_key")
 
     # Check if the computed score is as expected
     assert abs(net_score - expected_net_score) < 1e-3
@@ -64,7 +64,7 @@ def test_concurrency_in_compute_net_score(model):
     model.code.code_availability = 1
 
     start_time = time.time()
-    model.compute_net_score()
+    model.compute_net_score(api_key="dummy_key")
     end_time = time.time()
 
     total_time = end_time - start_time
