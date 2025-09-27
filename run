@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+#
+# This script is the main executable for the project, written in Python.
+# It handles installing dependencies, running tests, and executing the main URL processing logic.
+#
+# Usage:
+#   ./run install         - Installs required Python packages.
+#   ./run test            - Runs the test suite 
+#   ./run <URL_FILE_PATH> - Processes the given file of URLs.
+#
+import sys
+import os
+import subprocess
+
+# --- Configuration ---
+MAIN_SCRIPT = "main.py"
+REQUIREMENTS_FILE = "requirements.txt"
+
+def print_usage():
+    """Prints the usage instructions to stderr."""
+    print(f"Usage: {sys.argv[0]} {{install|test|URL_FILE}}", file=sys.stderr)
+    print(f"  install: Installs dependencies from {REQUIREMENTS_FILE}", file=sys.stderr)
+    print("  test: Runs the project's test suite", file=sys.stderr)
+    print("  URL_FILE: Path to a file containing newline-separated URLs", file=sys.stderr)
+
+def main():
+    """Main function to parse arguments and dispatch commands."""
+    if len(sys.argv) < 2:
+        print("Error: No command provided.", file=sys.stderr)
+        print_usage()
+        sys.exit(1)
+
+    command = sys.argv[1]
+
+    if command == "install":
+        print(f"Installing dependencies from {REQUIREMENTS_FILE}...")
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "--user", "-r", REQUIREMENTS_FILE],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Dependencies installed successfully.")
+        except subprocess.CalledProcessError as e:
+            print("Error: Failed to install dependencies.", file=sys.stderr)
+            print(e.stderr, file=sys.stderr)
+            sys.exit(1)
+
+    elif command == "test":
+        print("Running test suite...")
+        try:
+            subprocess.run([
+                sys.executable, "-m", "pytest"
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            print("Error: Test suite failed.", file=sys.stderr)
+            sys.exit(e.returncode)
+    
+    else:
+        url_file = command
+        if os.path.isfile(url_file):
+            print(f"Processing URL file: {url_file}")
+            try:
+                # Execute the main Python script, passing the file path to it
+                subprocess.run([sys.executable, MAIN_SCRIPT, url_file], check=True)
+            except subprocess.CalledProcessError:
+                print(f"Error: The script '{MAIN_SCRIPT}' encountered an error.", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print(f"Error: Command not recognized or file not found: '{url_file}'", file=sys.stderr)
+            print_usage()
+            sys.exit(1)
+
+if __name__ == "__main__":
+    main()
