@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 class Model:
     url: str
+    name: str
+    category: str
     size_score: Dict[str, float]
     license: float
     ramp_up_time: float
@@ -24,6 +26,8 @@ class Model:
         self.url = model_url
         self.dataset_url = dataset_url
         self.code_url = code_url
+        self.name = ''
+        self.category = ''
         self.size_score = {}
         self.license = 0.0
         self.ramp_up_time = 0.0
@@ -32,6 +36,23 @@ class Model:
         self.code = Code(code_url) #Contains code quality and availability scores
         self.performance_claims = 0.0
         self.net_score = 0.0
+
+    def get_name(self) -> str:
+        # Extract the model name from the URL
+        parsed_url = urlparse(self.url)
+        path_parts = parsed_url.path.strip('/').split('/')
+        if len(path_parts) >= 2:
+            return path_parts[1]  
+        return 'unknown-model'
+
+    def get_category(self) -> str:
+        if self.url:
+            return 'MODEL'
+        elif self.dataset_url:
+            return 'DATASET'
+        elif self.code_url:
+            return 'CODE'
+        return 'unknown-category'
 
     def get_size(self) -> Dict[str, float]:
         thresholds: Dict[str, int] = {
@@ -149,7 +170,6 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        print(f"Analyzing repository: {self.url}...")
 
         # Parse the URL to get the repository ID
         path_parts = urlparse(self.url).path.strip('/').split('/')
@@ -227,6 +247,7 @@ class Model:
 
 
     def compute_net_score(self, api_key: str) -> float:
+
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)
             future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
