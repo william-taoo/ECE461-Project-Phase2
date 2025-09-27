@@ -1,5 +1,5 @@
 import concurrent.futures
-from typing import Dict
+from typing import Dict, Any, Tuple, Callable
 from CustomObjects.Dataset import Dataset
 from CustomObjects.Code import Code
 from CustomObjects.LLMQuerier import LLMQuerier
@@ -8,9 +8,12 @@ from datetime import datetime, timedelta
 import re
 from huggingface_hub import HfApi, list_repo_commits
 from urllib.parse import urlparse
+import time
 
 class Model:
     url: str
+    name: str
+    category: str
     size_score: Dict[str, float]
     license: float
     ramp_up_time: float
@@ -20,10 +23,22 @@ class Model:
     performance_claims: float
     net_score: float
 
+    size_score_latency: int
+    license_latency: int
+    ramp_up_time_latency: int
+    bus_factor_latency: int
+    performance_claims_latency: int
+    dataset_and_code_score_latency: int
+    dataset_quality_latency: int
+    code_quality_latency: int
+    net_score_latency: int
+
     def __init__(self, model_url: str, dataset_url: str, code_url: str) -> None:
         self.url = model_url
         self.dataset_url = dataset_url
         self.code_url = code_url
+        self.name = ''
+        self.category = ''
         self.size_score = {}
         self.license = 0.0
         self.ramp_up_time = 0.0
@@ -32,6 +47,43 @@ class Model:
         self.code = Code(code_url) #Contains code quality and availability scores
         self.performance_claims = 0.0
         self.net_score = 0.0
+
+        self.size_score_latency = 0
+        self.license_latency = 0
+        self.ramp_up_time_latency = 0
+        self.bus_factor_latency = 0
+        self.performance_claims_latency = 0
+        self.dataset_and_code_score_latency = 0
+        self.dataset_quality_latency = 0
+        self.code_quality_latency = 0
+        self.net_score_latency = 0
+
+    def get_name(self) -> str:
+        try:
+            parsed_url = urlparse(self.url)
+            path_parts = parsed_url.path.strip('/').split('/')
+            if len(path_parts) >= 2:
+                return path_parts[1]
+        except Exception:
+            return 'unknown-name'
+        return 'unknown-name'
+
+    def get_category(self) -> str:
+        if self.url:
+            return 'MODEL'
+        elif self.dataset_url:
+            return 'DATASET'
+        elif self.code_url:
+            return 'CODE'
+        return 'unknown-category'
+    
+    def _time_metric(self, metric_func: Callable[..., Any], *args: Any, **kwargs: Any) -> Tuple[Any, int]:
+        # Return latency of metric functions
+        start_time = time.perf_counter()
+        result = metric_func(*args, **kwargs)
+        end_time = time.perf_counter()
+        latency_ms = round((end_time - start_time) * 1000)
+        return result, latency_ms
 
     def get_size(self) -> Dict[str, float]:
         thresholds: Dict[str, int] = {
@@ -149,7 +201,6 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-        print(f"Analyzing repository: {self.url}...")
 
         # Parse the URL to get the repository ID
         path_parts = urlparse(self.url).path.strip('/').split('/')
@@ -227,22 +278,23 @@ class Model:
 
 
     def compute_net_score(self, api_key: str) -> float:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_size: concurrent.futures.Future[Dict[str, float]] = executor.submit(self.get_size)
-            future_license: concurrent.futures.Future[float] = executor.submit(self.get_license)
-            future_ramp_up_time: concurrent.futures.Future[float] = executor.submit(self.get_ramp_up_time, api_key=api_key)
-            future_bus_factor: concurrent.futures.Future[float] = executor.submit(self.get_bus_factor)
-            future_dataset_quality: concurrent.futures.Future[float] = executor.submit(self.dataset.get_quality, api_key=api_key)
-            future_code_quality: concurrent.futures.Future[float] = executor.submit(self.code.get_quality)
-            future_performance_claims: concurrent.futures.Future[float] = executor.submit(self.get_performance_claims, api_key=api_key)
 
-            self.size_score = future_size.result()
-            self.license = future_license.result()
-            self.ramp_up_time = future_ramp_up_time.result()
-            self.bus_factor = future_bus_factor.result()
-            self.dataset.quality = future_dataset_quality.result()
-            self.code.quality = future_code_quality.result()
-            self.performance_claims = future_performance_claims.result()
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_size = executor.submit(self._time_metric, self.get_size)
+            future_license = executor.submit(self._time_metric, self.get_license)
+            future_ramp_up_time = executor.submit(self._time_metric, self.get_ramp_up_time, api_key=api_key)
+            future_bus_factor = executor.submit(self._time_metric, self.get_bus_factor)
+            future_performance_claims = executor.submit(self._time_metric, self.get_performance_claims, api_key=api_key)
+            future_dataset_quality = executor.submit(self._time_metric, self.dataset.get_quality, api_key=api_key)
+            future_code_quality = executor.submit(self._time_metric, self.code.get_quality)
+
+            self.size_score, self.size_score_latency = future_size.result()
+            self.license, self.license_latency = future_license.result()
+            self.ramp_up_time, self.ramp_up_time_latency = future_ramp_up_time.result()
+            self.bus_factor, self.bus_factor_latency = future_bus_factor.result()
+            self.performance_claims, self.performance_claims_latency = future_performance_claims.result()
+            self.dataset.quality, self.dataset_quality_latency = future_dataset_quality.result()
+            self.code.quality, self.code_quality_latency = future_code_quality.result()
 
         # Example weights, can be adjusted based on importance
         weights: Dict[str, float] = {
@@ -265,6 +317,16 @@ class Model:
             weights['code_quality'] * self.code.quality +
             weights['code_availability'] * self.code.code_availability +
             weights['performance_claims'] * self.performance_claims
+        )
+
+        self.net_score_latency = (
+            self.size_score_latency +
+            self.license_latency +
+            self.ramp_up_time_latency +
+            self.bus_factor_latency +
+            self.performance_claims_latency +
+            self.dataset_quality_latency +
+            self.code_quality_latency
         )
 
         return self.net_score
