@@ -38,12 +38,14 @@ class Model:
         self.net_score = 0.0
 
     def get_name(self) -> str:
-        # Extract the model name from the URL
-        parsed_url = urlparse(self.url)
-        path_parts = parsed_url.path.strip('/').split('/')
-        if len(path_parts) >= 2:
-            return path_parts[1]  
-        return 'unknown-model'
+        try:
+            parsed_url = urlparse(self.url)
+            path_parts = parsed_url.path.strip('/').split('/')
+            if len(path_parts) >= 2:
+                return path_parts[1]
+        except Exception:
+            return 'unknown-name'
+        return 'unknown-name'
 
     def get_category(self) -> str:
         if self.url:
