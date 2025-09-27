@@ -10,7 +10,7 @@
 2. Run `pip install -r requirements.txt` to install dependencies
 
 ## Testing:
-Run `python -m pytest` in the terminal to execute the test suite
+Run `python run_tests.py` in the terminal to execute the test suite
 
 ## Running the application:
 python main.py .\tests\testInput.txt

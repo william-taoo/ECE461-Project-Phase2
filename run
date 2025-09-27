@@ -15,6 +15,7 @@ import subprocess
 # --- Configuration ---
 MAIN_SCRIPT = "main.py"
 REQUIREMENTS_FILE = "requirements.txt"
+TEST_FILE = "run_tests.py"
 
 def print_usage():
     """Prints the usage instructions to stderr."""
@@ -41,17 +42,15 @@ def main():
                 capture_output=True,
                 text=True
             )
-            print("Dependencies installed successfully.")
         except subprocess.CalledProcessError as e:
             print("Error: Failed to install dependencies.", file=sys.stderr)
             print(e.stderr, file=sys.stderr)
             sys.exit(1)
 
     elif command == "test":
-        print("Running test suite...")
         try:
             subprocess.run([
-                sys.executable, "-m", "pytest"
+                sys.executable, TEST_FILE
             ], check=True)
         except subprocess.CalledProcessError as e:
             print("Error: Test suite failed.", file=sys.stderr)
@@ -60,7 +59,6 @@ def main():
     else:
         url_file = command
         if os.path.isfile(url_file):
-            print(f"Processing URL file: {url_file}")
             try:
                 # Execute the main Python script, passing the file path to it
                 subprocess.run([sys.executable, MAIN_SCRIPT, url_file], check=True)
