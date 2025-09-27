@@ -15,12 +15,13 @@ class Model:
     name: str
     category: str
     size_score: Dict[str, float]
-    license: float
+    license_score: float
     ramp_up_time: float
     bus_factor: float
     dataset: Dataset
     code: Code
     performance_claims: float
+    dataset_and_code_score: float
     net_score: float
 
     size_score_latency: int
@@ -40,12 +41,13 @@ class Model:
         self.name = ''
         self.category = ''
         self.size_score = {}
-        self.license = 0.0
+        self.license_score = 0.0
         self.ramp_up_time = 0.0
         self.bus_factor = 0.0
         self.dataset = Dataset(dataset_url, model_url) #Contains dataset quality and availability scores
         self.code = Code(code_url) #Contains code quality and availability scores
         self.performance_claims = 0.0
+        self.dataset_and_code_score = 0.0
         self.net_score = 0.0
 
         self.size_score_latency = 0
@@ -276,6 +278,16 @@ class Model:
         except Exception:
             return 0.0
 
+    def get_dataset_and_code_score(self) -> float:
+        """
+        Averages the dataset and code availability scores.
+
+        """
+        dataset_availability = getattr(self.dataset, 'dataset_availability', 0.0)
+        code_availability = getattr(self.code, 'code_availability', 0.0)
+        
+        return (dataset_availability + code_availability) / 2.0
+
 
     def compute_net_score(self, api_key: str) -> float:
 
@@ -287,14 +299,16 @@ class Model:
             future_performance_claims = executor.submit(self._time_metric, self.get_performance_claims, api_key=api_key)
             future_dataset_quality = executor.submit(self._time_metric, self.dataset.get_quality, api_key=api_key)
             future_code_quality = executor.submit(self._time_metric, self.code.get_quality)
+            future_dataset_and_code_score = executor.submit(self._time_metric, self.get_dataset_and_code_score)
 
             self.size_score, self.size_score_latency = future_size.result()
-            self.license, self.license_latency = future_license.result()
+            self.license_score, self.license_latency = future_license.result()
             self.ramp_up_time, self.ramp_up_time_latency = future_ramp_up_time.result()
             self.bus_factor, self.bus_factor_latency = future_bus_factor.result()
             self.performance_claims, self.performance_claims_latency = future_performance_claims.result()
             self.dataset.quality, self.dataset_quality_latency = future_dataset_quality.result()
             self.code.quality, self.code_quality_latency = future_code_quality.result()
+            self.dataset_and_code_score, self.dataset_and_code_score_latency = future_dataset_and_code_score.result()
 
         # Example weights, can be adjusted based on importance
         weights: Dict[str, float] = {
@@ -305,18 +319,20 @@ class Model:
             'dataset_availability': 0.025,
             'code_quality': 0.005,
             'code_availability': 0.025,
-            'performance_claims': 0.30
+            'performance_claims': 0.25,
+            'dataset_and_code_score': 0.05
         }
 
         self.net_score = (
-            weights['license'] * self.license +
+            weights['license'] * self.license_score +
             weights['ramp_up_time'] * self.ramp_up_time +
             weights['bus_factor'] * self.bus_factor +
             weights['dataset_quality'] * self.dataset.quality +
             weights['dataset_availability'] * self.dataset.dataset_availability +
             weights['code_quality'] * self.code.quality +
             weights['code_availability'] * self.code.code_availability +
-            weights['performance_claims'] * self.performance_claims
+            weights['performance_claims'] * self.performance_claims +
+            weights['dataset_and_code_score'] * self.dataset_and_code_score
         )
 
         self.net_score_latency = (
@@ -326,7 +342,8 @@ class Model:
             self.bus_factor_latency +
             self.performance_claims_latency +
             self.dataset_quality_latency +
-            self.code_quality_latency
+            self.code_quality_latency +
+            self.dataset_and_code_score_latency
         )
 
         return self.net_score

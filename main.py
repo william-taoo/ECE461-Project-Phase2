@@ -1,20 +1,91 @@
 import sys
 import json
-import time
+import os
+import logging
 from pathlib import Path
+from dotenv import load_dotenv
+
+os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
+os.environ['HF_HUB_VERBOSITY'] = 'error'
+
+def setup_logging():
+    """
+    Configures the root logger based on environment variables.
+    
+    Reads LOG_LEVEL and LOG_FILE from the environment to set up logging.
+    - LOG_LEVEL: 0 for silent (creates a blank log file), 1 for INFO, 2 for DEBUG.
+    - LOG_FILE: The path to the log file.
+    """
+    try:
+        log_level_str = os.getenv("LOG_LEVEL", "0")
+        log_level = int(log_level_str)
+    except (ValueError, TypeError):
+        print(f"Warning: Invalid LOG_LEVEL '{log_level_str}'. Defaulting to 0 (silent).", file=sys.stderr)
+        log_level = 0
+
+    # Get the root logger and clear any handlers that may have been configured
+    root_logger = logging.getLogger()
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
+
+    # If the log level is 0, create a blank log file and disable logging.
+    if log_level == 0:
+        logging.getLogger().propagate = False
+        logging.getLogger().disabled = True
+        
+        log_file = os.getenv("LOG_FILE")
+        if log_file and log_file.strip():
+            try:
+                with open(log_file, 'w') as f:
+                    pass
+            except (IOError, PermissionError) as e:
+                print(f"Error: Could not create blank log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        return
+
+    # Determine the actual logging level to set
+    if log_level == 1:
+        level_to_set = logging.INFO
+    elif log_level >= 2:
+        level_to_set = logging.DEBUG
+    else:
+        return
+
+    # Configure the root logger
+    root_logger.setLevel(level_to_set)
+    log_file = os.getenv("LOG_FILE")
+
+    if log_file and log_file.strip():
+        try:
+            file_handler = logging.FileHandler(log_file)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
+            logging.info(f"Logging configured successfully. Level: {logging.getLevelName(level_to_set)}, File: '{log_file}'")
+        except (IOError, PermissionError) as e:
+            print(f"Error: Could not write to log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print(f"Warning: LOG_LEVEL is set to '{log_level}', but no LOG_FILE was specified. Logs will not be saved.", file=sys.stderr)
+
+
+
+load_dotenv()
+
+
+setup_logging()
+
+
+
+# Import other modules.
 from URL_handler import URLHandler
 from CLI_parser import read_urls
-from dotenv import load_dotenv
-import os
 
 def main():
-    
-    # Load environment variables from .env file
-    load_dotenv()
     api_key = os.getenv("API_KEY")
 
     if not api_key:
-        print("Error: API_KEY environment variable not set. Make sure it is in your .env file.", file=sys.stderr)
+        print("Error: API_KEY environment variable not set. Please check your .env file.", file=sys.stderr)
         sys.exit(1)
 
     if len(sys.argv) != 2:
@@ -22,7 +93,7 @@ def main():
         sys.exit(1)
 
     url_file_path = sys.argv[1]
-    
+
     urls = read_urls(Path(url_file_path))
 
     models = URLHandler.process_urls(urls)
@@ -44,11 +115,12 @@ def main():
             "bus_factor_latency": model.bus_factor_latency,
             "performance_claims": model.performance_claims,
             "performance_claims_latency": model.performance_claims_latency,
-            "license": model.license,
+            "license": model.license_score,
             "license_latency": model.license_latency,
             "size_score": model.size_score,
             "size_score_latency": model.size_score_latency,
-            # "dataset_and_code_score": getattr(model, 'dataset_and_code_score', 0.0), 
+            "dataset_and_code_score": model.dataset_and_code_score,
+            "dataset_and_code_score_latency": model.dataset_and_code_score_latency,
             "dataset_quality": model.dataset.quality,
             "code_quality": model.code.quality,
         }
