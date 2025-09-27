@@ -42,6 +42,7 @@ def main():
                 capture_output=True,
                 text=True
             )
+            sys.exit(0)
         except subprocess.CalledProcessError as e:
             print("Error: Failed to install dependencies.", file=sys.stderr)
             print(e.stderr, file=sys.stderr)
@@ -52,6 +53,7 @@ def main():
             subprocess.run([
                 sys.executable, TEST_FILE
             ], check=True)
+            sys.exit(0)
         except subprocess.CalledProcessError as e:
             print("Error: Test suite failed.", file=sys.stderr)
             sys.exit(e.returncode)
@@ -62,6 +64,7 @@ def main():
             try:
                 # Execute the main Python script, passing the file path to it
                 subprocess.run([sys.executable, MAIN_SCRIPT, url_file], check=True)
+                sys.exit(0)
             except subprocess.CalledProcessError:
                 print(f"Error: The script '{MAIN_SCRIPT}' encountered an error.", file=sys.stderr)
                 sys.exit(1)
