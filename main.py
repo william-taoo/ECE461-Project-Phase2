@@ -54,57 +54,71 @@ def setup_logging():
     - LOG_LEVEL: 0 for silent (creates a blank log file), 1 for INFO, 2 for DEBUG.
     - LOG_FILE: The path to the log file.
     """
-    # Parse LOG_LEVEL, default to 0 on invalid input
-    log_level_str = os.getenv("LOG_LEVEL", "0")
     try:
+        log_level_str = os.getenv("LOG_LEVEL", "0")
         log_level = int(log_level_str)
     except (ValueError, TypeError):
         print(f"Warning: Invalid LOG_LEVEL '{log_level_str}'. Defaulting to 0 (silent).", file=sys.stderr)
         log_level = 0
 
-    # Validate LOG_FILE env
     log_file = os.getenv("LOG_FILE")
-    if not log_file or not log_file.strip():
+    if log_file is None:
         print("Warning: LOG_FILE environment variable is not set. Please set LOG_FILE to continue.", file=sys.stderr)
         sys.exit(1)
 
-    # Require that the file already exists and is not a directory
-    p = Path(log_file)
-    if not p.exists() or p.is_dir():
-        print(f"Error: LOG_FILE '{log_file}' does not exist or is a directory.", file=sys.stderr)
-        sys.exit(1)
-
-    # Prepare root logger (clear any prior handlers once)
+    # Get the root logger and clear any handlers that may have been configured
     root_logger = logging.getLogger()
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
 
-    # Level 0: disable logging; truncate existing file to blank
+    # If the log level is 0, create a blank log file and disable logging.
     if log_level == 0:
+        logging.getLogger().propagate = False
+        logging.getLogger().disabled = True
         logging.disable(logging.CRITICAL)
-        try:
-            open(log_file, "w", encoding="utf-8").close()
-        except (IOError, PermissionError) as e:
-            print(f"Error: Could not truncate log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
+
+        if log_file and log_file.strip():
+            try:
+                p = Path(log_file)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("", encoding="utf-8")
+            except (IOError, PermissionError) as e:
+                print(f"Error: Could not create blank log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            print("Warning: LOG_LEVEL is set to '0', but no LOG_FILE was specified.", file=sys.stderr)
             sys.exit(1)
+
+    # Determine the actual logging level to set
+    if log_level == 1:
+        level_to_set = logging.INFO
+    elif log_level >= 2:
+        level_to_set = logging.DEBUG
+    else:
         return
 
-    # Levels 1+: set level and attach a file handler
-    level_to_set = logging.INFO if log_level == 1 else logging.DEBUG
+    # Configure the root logger
     root_logger.setLevel(level_to_set)
 
-    try:
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        root_logger.addHandler(file_handler)
-    except (IOError, PermissionError) as e:
-        print(f"Error: Could not write to log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
-        sys.exit(1)
+    if log_file and log_file.strip():
+        try:
+            p = Path(log_file)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
 
-    # Initial log entries
-    logging.getLogger(__name__).info("program_start")
-    if level_to_set == logging.DEBUG:
-        logging.getLogger(__name__).debug("debug_enabled")
+            logging.getLogger(__name__).info("program_start")
+            if level_to_set == logging.DEBUG:
+                logging.getLogger(__name__).debug("debug_enabled")
+
+        except (IOError, PermissionError) as e:
+            print(f"Error: Could not write to log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print(f"Warning: LOG_LEVEL is set to '{log_level}', but no LOG_FILE was specified.", file=sys.stderr)
+        sys.exit(1)
 
 load_dotenv()
 
