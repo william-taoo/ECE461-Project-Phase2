@@ -3,6 +3,7 @@ import json
 import os
 import logging
 from pathlib import Path
+from unicodedata import category
 from dotenv import load_dotenv
 
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
@@ -93,8 +94,7 @@ def main():
     api_key = os.getenv("API_KEY")
 
     if not api_key:
-        print("Error: API_KEY environment variable not set. Please check your .env file.", file=sys.stderr)
-        sys.exit(1)
+        print("Warning: API_KEY not set; proceeding without it.", file=sys.stderr)
 
     if len(sys.argv) != 2:
         print(f"Usage: ./{os.path.basename(__file__)} URL_FILE", file=sys.stderr)
@@ -110,6 +110,10 @@ def main():
     for model in models:
         name = model.get_name()
         category = model.get_category()
+
+        if category != "MODEL":
+            continue
+
         model.compute_net_score(api_key=api_key)
 
         output_data = {
@@ -125,7 +129,7 @@ def main():
             "performance_claims_latency": int(model.performance_claims_latency),
             "license": model.license_score,
             "license_latency": int(model.license_latency),
-            "size_score": model.size_score,
+            "size_score": model.size_score if model.size_score is not None else {},
             "size_score_latency": int(model.size_score_latency),
             "dataset_and_code_score": model.dataset_and_code_score,
             "dataset_and_code_score_latency": int(model.dataset_and_code_score_latency),
@@ -137,6 +141,7 @@ def main():
 
         # Print the final JSON object to stdout
         print(json.dumps(output_data))
+    return 0
 
 if __name__ == "__main__":
     main()

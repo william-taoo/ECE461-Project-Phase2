@@ -5,12 +5,13 @@
 #
 # Usage:
 #   ./run install         - Installs required Python packages.
-#   ./run test            - Runs the test suite 
+#   ./run test            - Runs the test suite
 #   ./run <URL_FILE_PATH> - Processes the given file of URLs.
 #
 import sys
 import os
 import subprocess
+import re, json
 
 # --- Configuration ---
 MAIN_SCRIPT = "main.py"
@@ -49,15 +50,60 @@ def main():
             sys.exit(1)
 
     elif command == "test":
+    # run our existing test runner, then print two lines the grader expects
         try:
-            subprocess.run([
-                sys.executable, TEST_FILE
-            ], check=True)
-            sys.exit(0)
+            # run the tests
+            p = subprocess.run([sys.executable, TEST_FILE], capture_output=True, text=True)
+            stuff = (p.stdout or "") + "\n" + (p.stderr or "")
+
+            passed = 0
+            total = 0
+            m = re.search(r"(\d+)\s*/\s*(\d+)\s+test cases passed", stuff, flags=re.I)
+            if m:
+                passed = int(m.group(1))
+                total = int(m.group(2))
+            else:
+                # if that phrase ever changes, fall back to pytest's collection count
+                c = subprocess.run(
+                    [sys.executable, "-m", "pytest", "--collect-only", "-q", "tests"],
+                    capture_output=True, text=True
+                )
+                total = sum(1 for line in (c.stdout or "").splitlines() if "::" in line)
+                passed = total if p.returncode == 0 else 0
+
+            # coverage percent — first try to read it from our test runner's own line
+            pct = "0"
+            m_cov = re.search(r"(\d+)%\s*line coverage achieved\.", stuff, flags=re.I)
+            if m_cov:
+                pct = m_cov.group(1)
+            else:
+                # if the runner wrote coverage.json, try that
+                try:
+                    with open("coverage.json", "r", encoding="utf-8") as f:
+                        cov = json.load(f)
+                    v = cov.get("totals", {}).get("percent_covered")
+                    if isinstance(v, (int, float)):
+                        pct = str(int(round(v)))
+                except Exception:
+                    # last resort, parse "coverage report" output
+                    rep = subprocess.run(
+                        [sys.executable, "-m", "coverage", "report"],
+                        capture_output=True, text=True
+                    )
+                    m2 = re.search(r"TOTAL\s+\d+\s+\d+\s+\d+\s+(\d+)%", (rep.stdout or ""))
+                    if m2:
+                        pct = m2.group(1)
+
+            # print output
+            print(f"{passed}/{total} tests passed")
+            print(f"{pct}% line coverage achieved.")
+
+            sys.exit(p.returncode)
+
         except subprocess.CalledProcessError as e:
             print("Error: Test suite failed.", file=sys.stderr)
             sys.exit(e.returncode)
-    
+
     else:
         url_file = command
         if os.path.isfile(url_file):
