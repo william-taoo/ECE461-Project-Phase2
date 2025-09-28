@@ -95,8 +95,7 @@ def main():
                         pct = m2.group(1)
 
             # print output
-            print(f"{passed}/{total} tests passed")
-            print(f"{pct}% line coverage achieved.")
+            print(f"{passed}/{total} tests passed. {pct}% line coverage achieved.")
 
             sys.exit(0)  # success
 
