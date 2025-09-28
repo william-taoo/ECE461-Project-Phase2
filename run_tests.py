@@ -5,21 +5,25 @@ import os
 
 def run_tests_and_coverage():
     """
-    Runs pytest, captures test and coverage results, and prints a summary.
+    Runs pytest silently, captures test and coverage results, and cleans up.
     Exits with 0 on success and a non-zero code on failure.
     """
     command = [
         sys.executable,
         "-m", "pytest",
         "-qq", "--tb=no",
-        "--cov=.",  # Automatically discover and measure all imported modules
+        "--cov=.",
         "--cov-report=json:coverage.json",
         "--json-report",
         "--json-report-file=report.json",
         "tests/"
     ]
 
-    result = subprocess.run(command)
+    result = subprocess.run(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
     
     passed_count = 0
     total_count = 0
@@ -43,8 +47,9 @@ def run_tests_and_coverage():
         print("Warning: Could not parse 'coverage.json'. Reporting 0% coverage.", file=sys.stderr)
         coverage_percent = 0
 
-    # --- Print Final Output ---
-    print(f"{passed_count}/{total_count} test cases passed. {coverage_percent}% line coverage achieved.")
+
+    summary_message = f"{passed_count}/{total_count} test cases passed. {coverage_percent}% line coverage achieved. "
+    print(summary_message)
     
     # --- Clean up report files ---
     if os.path.exists("report.json"):

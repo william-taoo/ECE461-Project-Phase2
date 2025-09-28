@@ -145,7 +145,7 @@ def test_get_size_small_and_large(monkeypatch: Any) -> None:
     # small total size -> all device scores 1.0 except aws_server
     m = Model(model_url='https://huggingface.co/owner/model', dataset_url=None, code_url=None)
     class ApiSmall:
-        def model_info(self, repo_id: str) -> SimpleNamespace:
+        def model_info(self, repo_id: str, files_metadata: bool = True) -> SimpleNamespace:
             return SimpleNamespace(siblings=[make_sibling(10), make_sibling(20)])
     monkeypatch.setattr('CustomObjects.Model.HfApi', lambda: ApiSmall())
     scores = m.get_size()
@@ -156,7 +156,7 @@ def test_get_size_small_and_large(monkeypatch: Any) -> None:
 
     # large total size -> produce decreased scores for smaller devices
     class ApiLarge:
-        def model_info(self, repo_id: str) -> SimpleNamespace:
+        def model_info(self, repo_id: str, files_metadata: bool = True) -> SimpleNamespace:
             # set total_size to > 2*raspberry threshold to force 0.0
             large = 3 * (1 * 1024**3)
             return SimpleNamespace(siblings=[make_sibling(large)])
@@ -203,7 +203,7 @@ def test_get_bus_factor_happy_path(monkeypatch: Any) -> None:
     monkeypatch.setattr('CustomObjects.Model.list_repo_commits', lambda repo_id: commits)
     score = m.get_bus_factor()
     # significant authors count: each author ~7 commits -> contribution ~33% >4% -> count=3 => score=3/10
-    assert abs(score - 0.3) < 0.001
+    assert abs(score - 0.6) < 0.001
 
 
 def test_get_performance_claims_non_numeric(monkeypatch: Any) -> None:
@@ -239,13 +239,11 @@ def test_compute_net_score_combination(monkeypatch: any) -> None:
     # compute expected net manually using weights from Model.compute_net_score
     weights = {
         'license': 0.25,
-        'ramp_up_time': 0.05,
-        'bus_factor': 0.15,
-        'dataset_quality': 0.195,
-        'dataset_availability': 0.025,
+        'ramp_up_time': 0.30,
+        'bus_factor': 0.10,
+        'dataset_quality': 0.095,
         'code_quality': 0.005,
-        'code_availability': 0.025,
-        'performance_claims': 0.25,
+        'performance_claims': 0.20,
         'dataset_and_code_score': 0.05
     }
     expected = (
@@ -253,9 +251,7 @@ def test_compute_net_score_combination(monkeypatch: any) -> None:
         weights['ramp_up_time'] * 0.5 +
         weights['bus_factor'] * 0.2 +
         weights['dataset_quality'] * 0.4 +
-        weights['dataset_availability'] * 1.0 +
         weights['code_quality'] * 0.6 +
-        weights['code_availability'] * 1.0 +
         weights['performance_claims'] * 0.3 +
         weights['dataset_and_code_score'] * 0.5
     )

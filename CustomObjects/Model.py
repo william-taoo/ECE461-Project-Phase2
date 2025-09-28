@@ -240,7 +240,7 @@ class Model:
 
         try:
             # 1. Instantiate the API client and fetch commits
-            api = HfApi()
+            # api = HfApi()
             commits = list_repo_commits(repo_id=repo_id)
             
             # 2. Define the time window (last 365 days)
@@ -341,12 +341,10 @@ class Model:
         # Example weights, can be adjusted based on importance
         weights: Dict[str, float] = {
             'license': 0.25,
-            'ramp_up_time': 0.25,
+            'ramp_up_time': 0.30,
             'bus_factor': 0.10,
             'dataset_quality': 0.095,
-            'dataset_availability': 0.025,
             'code_quality': 0.005,
-            'code_availability': 0.025,
             'performance_claims': 0.20,
             'dataset_and_code_score': 0.05
         }
@@ -356,9 +354,7 @@ class Model:
             weights['ramp_up_time'] * self.ramp_up_time +
             weights['bus_factor'] * self.bus_factor +
             weights['dataset_quality'] * self.dataset.quality +
-            weights['dataset_availability'] * self.dataset.dataset_availability +
             weights['code_quality'] * self.code.quality +
-            weights['code_availability'] * self.code.code_availability +
             weights['performance_claims'] * self.performance_claims +
             weights['dataset_and_code_score'] * self.dataset_and_code_score
         )
