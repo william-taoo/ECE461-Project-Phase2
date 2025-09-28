@@ -239,13 +239,11 @@ def test_compute_net_score_combination(monkeypatch: any) -> None:
     # compute expected net manually using weights from Model.compute_net_score
     weights = {
         'license': 0.25,
-        'ramp_up_time': 0.05,
-        'bus_factor': 0.15,
-        'dataset_quality': 0.195,
-        'dataset_availability': 0.025,
+        'ramp_up_time': 0.30,
+        'bus_factor': 0.10,
+        'dataset_quality': 0.095,
         'code_quality': 0.005,
-        'code_availability': 0.025,
-        'performance_claims': 0.25,
+        'performance_claims': 0.20,
         'dataset_and_code_score': 0.05
     }
     expected = (
@@ -253,9 +251,7 @@ def test_compute_net_score_combination(monkeypatch: any) -> None:
         weights['ramp_up_time'] * 0.5 +
         weights['bus_factor'] * 0.2 +
         weights['dataset_quality'] * 0.4 +
-        weights['dataset_availability'] * 1.0 +
         weights['code_quality'] * 0.6 +
-        weights['code_availability'] * 1.0 +
         weights['performance_claims'] * 0.3 +
         weights['dataset_and_code_score'] * 0.5
     )
