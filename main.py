@@ -19,7 +19,7 @@ def format_output(rec: dict) -> str:
         '"bus_factor":%.2f,"bus_factor_latency":%d,'
         '"performance_claims":%.2f,"performance_claims_latency":%d,'
         '"license":%.2f,"license_latency":%d,'
-        '"size_score":{"raspberry_pi":%.2f,"jetson_nano":%.2f,"desktop_pc":%.2f,"aws_server":%.2f},'
+        '"size_score":\n{"raspberry_pi":%.2f,"jetson_nano":%.2f,"desktop_pc":%.2f,"aws_server":%.2f},'
         '"size_score_latency":%d,'
         '"dataset_and_code_score":%.2f,"dataset_and_code_score_latency":%d,'
         '"dataset_quality":%.2f,"dataset_quality_latency":%d,'
