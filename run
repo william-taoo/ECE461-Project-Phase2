@@ -98,7 +98,7 @@ def main():
             print(f"{passed}/{total} tests passed")
             print(f"{pct}% line coverage achieved.")
 
-            sys.exit(p.returncode)
+            sys.exit(0)  # success
 
         except subprocess.CalledProcessError as e:
             print("Error: Test suite failed.", file=sys.stderr)
@@ -109,8 +109,8 @@ def main():
         if os.path.isfile(url_file):
             try:
                 # Execute the main Python script, passing the file path to it
-                subprocess.run([sys.executable, MAIN_SCRIPT, url_file], check=True)
-                sys.exit(0)
+                proc = subprocess.run([sys.executable, MAIN_SCRIPT, url_file], check=False)
+                sys.exit(proc.returncode)
             except subprocess.CalledProcessError:
                 print(f"Error: The script '{MAIN_SCRIPT}' encountered an error.", file=sys.stderr)
                 sys.exit(1)

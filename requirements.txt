@@ -11,3 +11,4 @@ huggingface_hub
 flake8
 python-dotenv
 boto3
+transformers
