@@ -61,6 +61,11 @@ def setup_logging():
         print(f"Warning: Invalid LOG_LEVEL '{log_level_str}'. Defaulting to 0 (silent).", file=sys.stderr)
         log_level = 0
 
+    log_file = os.getenv("LOG_FILE")
+    if log_file is None:
+        print("Warning: LOG_FILE environment variable is not set. Please set LOG_FILE to continue.", file=sys.stderr)
+        sys.exit(1)
+
     # Get the root logger and clear any handlers that may have been configured
     root_logger = logging.getLogger()
     if root_logger.hasHandlers():
@@ -72,7 +77,6 @@ def setup_logging():
         logging.getLogger().disabled = True
         logging.disable(logging.CRITICAL)
 
-        log_file = os.getenv("LOG_FILE")
         if log_file and log_file.strip():
             try:
                 p = Path(log_file)
@@ -95,7 +99,6 @@ def setup_logging():
 
     # Configure the root logger
     root_logger.setLevel(level_to_set)
-    log_file = os.getenv("LOG_FILE")
 
     if log_file and log_file.strip():
         try:
