@@ -4,6 +4,9 @@ import logging
 from pathlib import Path
 from unicodedata import category
 from dotenv import load_dotenv
+import requests
+from URL_handler import URLHandler
+from CLI_parser import read_urls
 
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
 os.environ['HF_HUB_VERBOSITY'] = 'error'
@@ -78,7 +81,9 @@ def setup_logging():
             except (IOError, PermissionError) as e:
                 print(f"Error: Could not create blank log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
                 sys.exit(1)
-        return
+        else:
+            print("Warning: LOG_LEVEL is set to '0', but no LOG_FILE was specified.", file=sys.stderr)
+            sys.exit(1)
 
     # Determine the actual logging level to set
     if log_level == 1:
@@ -109,9 +114,8 @@ def setup_logging():
             print(f"Error: Could not write to log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
             sys.exit(1)
     else:
-        print(f"Warning: LOG_LEVEL is set to '{log_level}', but no LOG_FILE was specified. Logs will not be saved.", file=sys.stderr)
-
-
+        print(f"Warning: LOG_LEVEL is set to '{log_level}', but no LOG_FILE was specified.", file=sys.stderr)
+        sys.exit(1)
 
 load_dotenv()
 
@@ -119,10 +123,31 @@ load_dotenv()
 setup_logging()
 
 
+def validate_github_token() -> None:
+    """If GITHUB_TOKEN is set, verify it by hitting the GitHub API /user endpoint.
 
-# Import other modules.
-from URL_handler import URLHandler
-from CLI_parser import read_urls
+    - If the token yields a 401, exit with an error (invalid token).
+    - If the request fails for other reasons, print a warning but continue.
+    - If no token is set, do nothing.
+    """
+    token = os.getenv('GITHUB_TOKEN')
+    if not token:
+        return
+
+    headers = {
+        'Authorization': f'token {token}',
+        'Accept': 'application/vnd.github.v3+json',
+    }
+    try:
+        resp = requests.get('https://api.github.com/user', headers=headers, timeout=5)
+        if resp.status_code != 200:
+            print("Error: GITHUB_TOKEN appears to be invalid (401 Unauthorized). Please check the token.", file=sys.stderr)
+            sys.exit(1)
+    except Exception as e:
+        print(f"Warning: Could not validate GITHUB_TOKEN due to network error: {e}.", file=sys.stderr)
+        sys.exit(1)
+
+validate_github_token()
 
 def main():
     api_key = os.getenv("API_KEY")
