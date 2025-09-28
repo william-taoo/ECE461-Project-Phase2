@@ -90,7 +90,7 @@ class Model:
     def get_size(self) -> Dict[str, float]:
         thresholds: Dict[str, int] = {
             'raspberry_pi': 1 * 1024**3,  # 1 GB
-            'jetson_nano': 4 * 1024**3,   # 4 GB
+            'jetson_nano': 2 * 1024**3,   # 2 GB
             'desktop_pc': 16 * 1024**3,  # 16 GB
             'aws_server': float('inf')       # no limit
         }
@@ -105,13 +105,14 @@ class Model:
 
             # Use the HfApi to get model info, which includes file sizes
             api = HfApi()
-            model_info = api.model_info(repo_id=repo_id)
+            model_info = api.model_info(repo_id=repo_id, files_metadata=True)
 
             # Sum the size of all files in the repository
             total_size = sum(file.size for file in model_info.siblings if file.size is not None)
 
             # Calculate scores based on the total size
             for device, threshold in thresholds.items():
+
                 if device == 'aws_server':
                     scores[device] = 1.0
                     continue
@@ -125,12 +126,13 @@ class Model:
 
             return scores
         except Exception as e:
-            print(f"An unexpected error occurred while fetching the model size: {e}")
             return {}
 
 
     def get_license(self) -> float:
-        compatible_licenses = ['mit', 'bsd', 'lgpl']
+        compatible_licenses = ['mit', 'bsd', 'lgpl', 'apache-2.0']
+        # Use the HfApi to fetch only the README file
+        api = HfApi()
 
         # Parse the URL to get the repository ID
         path_parts = urlparse(self.url).path.strip('/').split('/')
@@ -138,8 +140,34 @@ class Model:
             return 0.0
         repo_id = f"{path_parts[0]}/{path_parts[1]}"
 
-        # Use the HfApi to fetch only the README file
-        api = HfApi()
+        try:
+            model_info = api.model_info(repo_id)
+            if model_info.cardData and "license" in model_info.cardData and model_info.cardData["license"].lower() in compatible_licenses:
+                return 1.0
+            else:
+                return 0.0
+        except Exception as e:
+            pass
+
+        # 1. First, try to find and check a dedicated LICENSE file.
+        try:
+            license_filepath = api.hf_hub_download(
+                repo_id=repo_id,
+                filename="LICENSE",
+                repo_type="model" # Explicitly state repo type
+            )
+            with open(license_filepath, 'r', encoding='utf-8') as f:
+                license_content = f.read().lower()
+            
+            for lic in compatible_licenses:
+                if lic in license_content:
+                    print("Found compatible license in LICENSE file.")
+                    return 1.0
+                
+        except Exception as e:
+            pass
+
+        # 2. If no LICENSE file, fall back to checking the README for a License section.
         readme_filepath = api.hf_hub_download(repo_id=repo_id, filename="README.md")
         with open(readme_filepath, 'r', encoding='utf-8') as f:
             readme_content = f.read()
@@ -216,8 +244,8 @@ class Model:
             commits = list_repo_commits(repo_id=repo_id)
             
             # 2. Define the time window (last 365 days)
-            years = 2
-            year_limit = datetime.now().astimezone() - timedelta(days=365*2)
+            years = 2.5
+            year_limit = datetime.now().astimezone() - timedelta(days=365*years)
             
             # 3. Filter commits from the last year and get author names
             recent_authors = []
@@ -243,7 +271,7 @@ class Model:
                     significant_authors_count += 1
 
             # 6. Calculate the final score (capped at 1.0)
-            min_total_contributors = 10.0
+            min_total_contributors = 5.0
             score = min(1.0, significant_authors_count / min_total_contributors)
             return score
         
@@ -264,7 +292,7 @@ class Model:
         )
         prompt = (
             f"Assess the performance documentation for the model located at {self.url}. "
-            "Provide a score between 0 (no documentation) and 1 (clear, detailed documentation). "
+            "Provide a score between 0 (no documentation) and 1 (clear, detailed documentation)."
             "Performance documentation refers to evaluation results, benchmarks, or metrics reported in the README. "
             "Provide only the numeric score as output, without any additional text or explanation."
         )
@@ -313,13 +341,13 @@ class Model:
         # Example weights, can be adjusted based on importance
         weights: Dict[str, float] = {
             'license': 0.25,
-            'ramp_up_time': 0.05,
-            'bus_factor': 0.15,
-            'dataset_quality': 0.195,
+            'ramp_up_time': 0.25,
+            'bus_factor': 0.10,
+            'dataset_quality': 0.095,
             'dataset_availability': 0.025,
             'code_quality': 0.005,
             'code_availability': 0.025,
-            'performance_claims': 0.25,
+            'performance_claims': 0.20,
             'dataset_and_code_score': 0.05
         }
 

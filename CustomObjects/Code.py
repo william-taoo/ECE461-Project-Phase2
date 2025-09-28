@@ -84,13 +84,20 @@ class Code:
                 if error_count == 0:
                     self.quality = 1.0
                     return self.quality
-
-                # score = max(0, 1 - LOC / (error_count * 5))
-                score = 1.0 - (loc / (error_count * 5.0))
-                if score < 0.0:
-                    score = 0.0
-                if score > 1.0:
-                    score = 1.0
+                
+                # --- DYNAMIC MULTIPLIER LOGIC ---
+                # The penalty multiplier changes based on the total lines of code.
+                # Smaller projects are penalized more heavily for each error.
+                if loc < 500:
+                    multiplier = 5   # Very strict for small scripts
+                elif loc < 5000:
+                    multiplier = 20  # Moderately strict for small projects
+                elif loc < 20000:
+                    multiplier = 50  # Less strict for medium projects
+                else:
+                    multiplier = 100 # Lenient for very large projects
+                
+                score = max(0.0, 1.0 - (loc / (error_count * multiplier)))
 
                 self.quality = float(score)
                 return self.quality
