@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import sys
+from typing import Optional
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -40,7 +41,7 @@ def read_urls(path: Path) -> list[str]:
                 urls.append(line)
     return urls
 
-def run(argv: list[str] | None = None) -> int:
+def run(argv: Optional[list[str]] = None) -> int:
     try:
         ns = build_parser().parse_args(argv)
         for url in read_urls(ns.url_file):
