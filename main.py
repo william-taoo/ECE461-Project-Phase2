@@ -3,6 +3,7 @@ import json
 import os
 import logging
 from pathlib import Path
+from unicodedata import category
 from dotenv import load_dotenv
 
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
@@ -11,7 +12,7 @@ os.environ['HF_HUB_VERBOSITY'] = 'error'
 def setup_logging():
     """
     Configures the root logger based on environment variables.
-    
+
     Reads LOG_LEVEL and LOG_FILE from the environment to set up logging.
     - LOG_LEVEL: 0 for silent (creates a blank log file), 1 for INFO, 2 for DEBUG.
     - LOG_FILE: The path to the log file.
@@ -32,12 +33,14 @@ def setup_logging():
     if log_level == 0:
         logging.getLogger().propagate = False
         logging.getLogger().disabled = True
-        
+        logging.disable(logging.CRITICAL)
+
         log_file = os.getenv("LOG_FILE")
         if log_file and log_file.strip():
             try:
-                with open(log_file, 'w') as f:
-                    pass
+                p = Path(log_file)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("", encoding="utf-8")
             except (IOError, PermissionError) as e:
                 print(f"Error: Could not create blank log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
                 sys.exit(1)
@@ -57,11 +60,17 @@ def setup_logging():
 
     if log_file and log_file.strip():
         try:
-            file_handler = logging.FileHandler(log_file)
+            p = Path(log_file)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             file_handler.setFormatter(formatter)
             root_logger.addHandler(file_handler)
-            logging.info(f"Logging configured successfully. Level: {logging.getLevelName(level_to_set)}, File: '{log_file}'")
+
+            logging.getLogger(__name__).info("program_start")
+            if level_to_set == logging.DEBUG:
+                logging.getLogger(__name__).debug("debug_enabled")
+
         except (IOError, PermissionError) as e:
             print(f"Error: Could not write to log file '{log_file}'. Please check permissions. Error: {e}", file=sys.stderr)
             sys.exit(1)
@@ -85,8 +94,7 @@ def main():
     api_key = os.getenv("API_KEY")
 
     if not api_key:
-        print("Error: API_KEY environment variable not set. Please check your .env file.", file=sys.stderr)
-        sys.exit(1)
+        print("Warning: API_KEY not set; proceeding without it.", file=sys.stderr)
 
     if len(sys.argv) != 2:
         print(f"Usage: ./{os.path.basename(__file__)} URL_FILE", file=sys.stderr)
@@ -102,31 +110,38 @@ def main():
     for model in models:
         name = model.get_name()
         category = model.get_category()
+
+        if category != "MODEL":
+            continue
+
         model.compute_net_score(api_key=api_key)
-        
+
         output_data = {
             "name": name,
             "category": category,
             "net_score": model.net_score,
-            "net_score_latency": model.net_score_latency,
+            "net_score_latency": int(model.net_score_latency),
             "ramp_up_time": model.ramp_up_time,
-            "ramp_up_time_latency": model.ramp_up_time_latency,
+            "ramp_up_time_latency": int(model.ramp_up_time_latency),
             "bus_factor": model.bus_factor,
-            "bus_factor_latency": model.bus_factor_latency,
+            "bus_factor_latency": int(model.bus_factor_latency),
             "performance_claims": model.performance_claims,
-            "performance_claims_latency": model.performance_claims_latency,
+            "performance_claims_latency": int(model.performance_claims_latency),
             "license": model.license_score,
-            "license_latency": model.license_latency,
-            "size_score": model.size_score,
-            "size_score_latency": model.size_score_latency,
+            "license_latency": int(model.license_latency),
+            "size_score": model.size_score if model.size_score is not None else {},
+            "size_score_latency": int(model.size_score_latency),
             "dataset_and_code_score": model.dataset_and_code_score,
-            "dataset_and_code_score_latency": model.dataset_and_code_score_latency,
+            "dataset_and_code_score_latency": int(model.dataset_and_code_score_latency),
             "dataset_quality": model.dataset.quality,
+            "dataset_quality_latency": int(model.dataset_quality_latency),
             "code_quality": model.code.quality,
+            "code_quality_latency": int(model.code_quality_latency),
         }
 
         # Print the final JSON object to stdout
         print(json.dumps(output_data))
+    return 0
 
 if __name__ == "__main__":
     main()
