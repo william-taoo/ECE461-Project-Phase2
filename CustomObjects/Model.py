@@ -240,7 +240,7 @@ class Model:
 
         try:
             # 1. Instantiate the API client and fetch commits
-            api = HfApi()
+            # api = HfApi()
             commits = list_repo_commits(repo_id=repo_id)
             
             # 2. Define the time window (last 365 days)

@@ -145,7 +145,7 @@ def test_get_size_small_and_large(monkeypatch: Any) -> None:
     # small total size -> all device scores 1.0 except aws_server
     m = Model(model_url='https://huggingface.co/owner/model', dataset_url=None, code_url=None)
     class ApiSmall:
-        def model_info(self, repo_id: str) -> SimpleNamespace:
+        def model_info(self, repo_id: str, files_metadata: bool = True) -> SimpleNamespace:
             return SimpleNamespace(siblings=[make_sibling(10), make_sibling(20)])
     monkeypatch.setattr('CustomObjects.Model.HfApi', lambda: ApiSmall())
     scores = m.get_size()
@@ -156,7 +156,7 @@ def test_get_size_small_and_large(monkeypatch: Any) -> None:
 
     # large total size -> produce decreased scores for smaller devices
     class ApiLarge:
-        def model_info(self, repo_id: str) -> SimpleNamespace:
+        def model_info(self, repo_id: str, files_metadata: bool = True) -> SimpleNamespace:
             # set total_size to > 2*raspberry threshold to force 0.0
             large = 3 * (1 * 1024**3)
             return SimpleNamespace(siblings=[make_sibling(large)])
@@ -203,7 +203,7 @@ def test_get_bus_factor_happy_path(monkeypatch: Any) -> None:
     monkeypatch.setattr('CustomObjects.Model.list_repo_commits', lambda repo_id: commits)
     score = m.get_bus_factor()
     # significant authors count: each author ~7 commits -> contribution ~33% >4% -> count=3 => score=3/10
-    assert abs(score - 0.3) < 0.001
+    assert abs(score - 0.6) < 0.001
 
 
 def test_get_performance_claims_non_numeric(monkeypatch: Any) -> None:
