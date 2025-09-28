@@ -1,4 +1,5 @@
 import concurrent.futures
+import math
 from typing import Dict, Any, Tuple, Callable
 from CustomObjects.Dataset import Dataset
 from CustomObjects.Code import Code
@@ -192,6 +193,35 @@ class Model:
                 return 1.0
 
         return 0.0
+    
+    def get_popularity_score(self) -> float:
+        """Helper function to calculate a score based on likes and downloads."""
+        try:
+            path_parts = urlparse(self.url).path.strip('/').split('/')
+            if len(path_parts) < 2:
+                return 0.0
+            repo_id = f"{path_parts[0]}/{path_parts[1]}"
+            
+            api = HfApi()
+            model_info = api.model_info(repo_id=repo_id)
+            
+            downloads = model_info.downloads or 0
+            likes = model_info.likes or 0
+            
+            # Normalize scores on a logarithmic scale
+            # A score of 1.0 is achieved at 1,000,000 downloads or 1,000 likes
+            dwnlds = 100000
+            lks = 1000
+            download_score = min(1.0, math.log10(downloads + 1) / math.log10(dwnlds))
+            like_score = min(1.0, math.log10(likes + 1) / math.log10(lks))
+            
+            # Weighted average of the two popularity metrics
+            popularity_score = (0.7 * download_score) + (0.3 * like_score)
+            return popularity_score
+
+        except Exception as e:
+            print(f"Could not fetch popularity info: {e}")
+            return 0.0
 
     def get_ramp_up_time(self, api_key: str) -> float:
         """
@@ -205,19 +235,25 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
+
+        popularity_score = self.get_popularity_score()
+
         llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key=api_key)
         prompt = (
-            f"Assess the ramp-up time for using the model located at {self.url}. Provide a score between 0 (very difficult) and 1 (very easy). "
+            f"Assess the ramp-up time for using the model located at \"{self.url}\". Provide a score between 0 (very difficult) and 1 (very easy). "
             "Ramp up time refers to the time required for a new user to become productive with the model."
             "Calculate ramp-up time based on factors such as documentation quality and clarity, community support, and complexity of the model."
+            "If the README or documentation contains only headers without meaningful text return a low score."
             "Provide only the numeric score as output, without any additional text or explanation."
         )
+        # print("prompt:", prompt)
         response = llm_querier.query(prompt=prompt)
 
-        if response is None:
-            return 0.0
+        llm_score = float(response) if response else 0.0
 
-        return float(response)
+        final_score = (0.8 * popularity_score) + (0.2 * llm_score)
+
+        return float(final_score)
 
     def get_bus_factor(self) -> float:
         """
@@ -291,9 +327,10 @@ class Model:
             api_key=api_key,
         )
         prompt = (
-            f"Assess the performance documentation for the model located at {self.url}. "
+            f"Assess the performance documentation for the model located at {self.url}."
             "Provide a score between 0 (no documentation) and 1 (clear, detailed documentation)."
-            "Performance documentation refers to evaluation results, benchmarks, or metrics reported in the README. "
+            "Performance documentation refers to evaluation results, benchmarks, or metrics reported in the README."
+            "Evaluation results will be in the form of tables, or charts under sections like 'Evaluation', 'Results', 'Benchmarks', or similar."
             "Provide only the numeric score as output, without any additional text or explanation."
         )
         response = llm_querier.query(prompt=prompt)

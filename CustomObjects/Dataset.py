@@ -128,6 +128,10 @@ class Dataset:
         Combine when both exist: 0.5 * LLM + 0.5 * Popularity
         Otherwise use whichever is available.
         """
+        # Return 0 if no dataset URL is provided
+        if self.dataset_availability == 0.0:
+            return 0.0
+
         # Popularity (HF dataset URL only)
         popularity_score = None
         if self.dataset_url and "huggingface.co/datasets/" in self.dataset_url:
