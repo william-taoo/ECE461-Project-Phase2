@@ -1,5 +1,4 @@
 import sys
-import json
 import os
 import logging
 from pathlib import Path
@@ -8,6 +7,41 @@ from dotenv import load_dotenv
 
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
 os.environ['HF_HUB_VERBOSITY'] = 'error'
+
+def format_output(rec: dict) -> str:
+    return (
+        '{"name":"%s","category":"%s",'
+        '"net_score":%.2f,"net_score_latency":%d,'
+        '"ramp_up_time":%.2f,"ramp_up_time_latency":%d,'
+        '"bus_factor":%.2f,"bus_factor_latency":%d,'
+        '"performance_claims":%.2f,"performance_claims_latency":%d,'
+        '"license":%.2f,"license_latency":%d,'
+        '"size_score":{"raspberry_pi":%.2f,"jetson_nano":%.2f,"desktop_pc":%.2f,"aws_server":%.2f},'
+        '"size_score_latency":%d,'
+        '"dataset_and_code_score":%.2f,"dataset_and_code_score_latency":%d,'
+        '"dataset_quality":%.2f,"dataset_quality_latency":%d,'
+        '"code_quality":%.2f,"code_quality_latency":%d}'
+    ) % (
+        rec["name"],
+        rec["category"],
+
+        rec["net_score"],           int(rec["net_score_latency"]),
+        rec["ramp_up_time"],        int(rec["ramp_up_time_latency"]),
+        rec["bus_factor"],          int(rec["bus_factor_latency"]),
+        rec["performance_claims"],  int(rec["performance_claims_latency"]),
+        rec["license"],             int(rec["license_latency"]),
+
+        rec["size_score"]["raspberry_pi"],
+        rec["size_score"]["jetson_nano"],
+        rec["size_score"]["desktop_pc"],
+        rec["size_score"]["aws_server"],
+        int(rec["size_score_latency"]),
+
+        rec["dataset_and_code_score"],        int(rec["dataset_and_code_score_latency"]),
+        rec["dataset_quality"],               int(rec["dataset_quality_latency"]),
+        rec["code_quality"],                  int(rec["code_quality_latency"]),
+    )
+
 
 def setup_logging():
     """
@@ -140,7 +174,7 @@ def main():
         }
 
         # Print the final JSON object to stdout
-        print(json.dumps(output_data))
+        print(format_output(output_data))
     return 0
 
 if __name__ == "__main__":

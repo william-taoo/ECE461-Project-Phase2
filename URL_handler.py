@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from CustomObjects.Model import Model
 
 class URLHandler:
@@ -45,11 +45,11 @@ class URLHandler:
                     code_url=current_code_url
                 )
                 models.append(model)
-                
+
                 current_dataset_url = None
                 current_code_url = None
             else:
                 # Print warning for unknown URL types
                 print(f"Warning: Unknown URL type ignored: {url}")
-                
+
         return models

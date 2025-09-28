@@ -1,4 +1,3 @@
-from typing import Optional
 from urllib.parse import urlparse
 import os
 import git
@@ -34,10 +33,20 @@ class Code:
 
     def run_flake8(self, root: str) -> int:
         """Run flake8 on root and return total error/warning count."""
-        style = flake8.get_style_guide(
-            quiet=1,
-        )
-        report = style.check_files([root])
+        import sys, os
+        from flake8.api import legacy as flake8
+
+        style = flake8.get_style_guide(quiet=2)
+
+        # Temporarily silence stdout
+        old_stdout = sys.stdout
+        sys.stdout = open(os.devnull, "w")
+        try:
+            report = style.check_files([root])
+        finally:
+            sys.stdout.close()
+            sys.stdout = old_stdout
+
         return int(getattr(report, "total_errors", 0) or 0)
 
     def get_quality(self) -> float:
@@ -84,7 +93,7 @@ class Code:
                 if error_count == 0:
                     self.quality = 1.0
                     return self.quality
-                
+
                 # --- DYNAMIC MULTIPLIER LOGIC ---
                 # The penalty multiplier changes based on the total lines of code.
                 # Smaller projects are penalized more heavily for each error.
@@ -96,7 +105,7 @@ class Code:
                     multiplier = 50  # Less strict for medium projects
                 else:
                     multiplier = 100 # Lenient for very large projects
-                
+
                 score = max(0.0, 1.0 - (loc / (error_count * multiplier)))
 
                 self.quality = float(score)
