@@ -1,10 +1,7 @@
-import contextlib
-from typing import Optional
 from urllib.parse import urlparse
 import os
 import git
 import tempfile
-import io
 
 from flake8.api import legacy as flake8  # requires flake8 installed
 
