@@ -3,17 +3,17 @@ Tests for CLI_parser.
 
 These tests ensure the command-line parser and helper functions behave as expected:
  - parsing the single positional url_file argument
- - trimming whitespace and skipping blank lines
- - handling CSV triples of (code, dataset, model)
+ - trimming whitespace and skipping blank/invalid lines
+ - handling CSV triples and carrying forward the last seen dataset URL
  - error behaviour when files are missing
- - the helper run() which prints URLs and returns appropriate exit codes
 """
 
 from __future__ import annotations
 import pytest
 from pathlib import Path
-from typing import List
-from CLI_parser import build_parser, read_urls, run
+
+# Import the new function
+from CLI_parser import build_parser, parse_input_file
 
 def test_build_parser_accepts_url_file(tmp_path: Path) -> None:
     """build_parser should parse a single positional url_file argument."""
@@ -23,89 +23,76 @@ def test_build_parser_accepts_url_file(tmp_path: Path) -> None:
     ns = build_parser().parse_args([str(f)])
     assert ns.url_file == f
 
-
-def test_read_urls_skips_blanks_and_whitespace(tmp_path: Path) -> None:
-    """read_urls should trim whitespace and skip blank lines."""
+def test_parse_input_file_skips_blanks_and_whitespace(tmp_path: Path) -> None:
+    """parse_input_file should skip blank lines and lines with only whitespace."""
     f = tmp_path / "urls.txt"
     f.write_text(
-        "\n  https://a \nhttps://b  \n   \n",
+        "\n   \n  https://a.com,,https://model.com\n \n",
         encoding="utf-8",
     )
-    assert read_urls(f) == ["https://a", "https://b"]
+    # It should only parse the one valid line
+    assert len(parse_input_file(f)) == 1
 
-
-def test_read_urls_parses_csv_triple_in_order(tmp_path: Path) -> None:
-    """CSV lines should be parsed as <code>, <dataset>, <model> and emitted in that order."""
+def test_parse_input_file_parses_csv_triple(tmp_path: Path) -> None:
+    """CSV lines should be parsed as a tuple of (code, dataset, model)."""
     f = tmp_path / "urls.txt"
     f.write_text(
-        "https://github.com/google-research/bert, https://huggingface.co/datasets/bookcorpus/bookcorpus, https://huggingface.co/google-bert/bert-base-uncased\n",
+        "https://github.com/a/b, https://huggingface.co/datasets/c/d, https://huggingface.co/e/f\n",
         encoding="utf-8",
     )
-    urls = read_urls(f)
-    assert urls == [
-        "https://github.com/google-research/bert",
-        "https://huggingface.co/datasets/bookcorpus/bookcorpus",
-        "https://huggingface.co/google-bert/bert-base-uncased",
+    result = parse_input_file(f)
+    assert result == [
+        ("https://github.com/a/b", "https://huggingface.co/datasets/c/d", "https://huggingface.co/e/f")
     ]
 
-
-def test_read_urls_csv_with_missing_fields(tmp_path: Path) -> None:
-    """
-    CSV rows may have blank code/dataset.
-    If model is blank, the row is effectively skipped for the model, but non-empty fields are still emitted.
-    """
+def test_parse_input_file_handles_missing_fields_as_none(tmp_path: Path) -> None:
+    """Blank fields for code or dataset in a CSV row should become None."""
     f = tmp_path / "urls.txt"
     f.write_text(
         # only model present
-        ",,https://huggingface.co/parvk11/audience_classifier_model\n"
+        ",,https://model1\n"
         # code + model present, dataset blank
-        "https://github.com/org/repo, , https://huggingface.co/org/model\n"
-        # code + dataset present, model blank -> only code and dataset emitted
-        "https://github.com/only/code, https://huggingface.co/datasets/x/y, \n",
+        "https://code2, , https://model2\n",
         encoding="utf-8",
     )
-    urls = read_urls(f)
-    assert urls == [
-        "https://huggingface.co/parvk11/audience_classifier_model",
-        "https://github.com/org/repo",
-        "https://huggingface.co/org/model",
-        "https://github.com/only/code",
-        "https://huggingface.co/datasets/x/y",
+    result = parse_input_file(f)
+    assert result == [
+        (None, None, "https://model1"),
+        ("https://code2", None, "https://model2"),
     ]
 
-
-def test_read_urls_missing_file_raises(tmp_path: Path) -> None:
-    """read_urls should raise FileNotFoundError if the file is missing."""
-    missing = tmp_path / "does_not_exist.txt"
-    with pytest.raises(FileNotFoundError):
-        read_urls(missing)
-
-
-def test_run_prints_urls_and_returns_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """run() should print cleaned URLs and return 0 on success."""
+def test_parse_input_file_skips_row_if_model_url_is_missing(tmp_path: Path) -> None:
+    """If a CSV row has no model URL, the entire row should be skipped."""
     f = tmp_path / "urls.txt"
     f.write_text(
-        # one CSV triple plus single-line URLs and blanks
-        "https://github.com/google-research/bert, https://huggingface.co/datasets/bookcorpus/bookcorpus, https://huggingface.co/google-bert/bert-base-uncased\n"
-        "\n"
-        " https://extra-single\n",
+        "https://code.com, https://dataset.com, \n", # No model URL
         encoding="utf-8",
     )
-    exit_code = run([str(f)])
-    captured = capsys.readouterr()
-    assert exit_code == 0
-    assert captured.out.splitlines() == [
-        "https://github.com/google-research/bert",
-        "https://huggingface.co/datasets/bookcorpus/bookcorpus",
-        "https://huggingface.co/google-bert/bert-base-uncased",
-        "https://extra-single",
+    result = parse_input_file(f)
+    assert result == []
+
+def test_parse_input_file_handles_shared_dataset(tmp_path: Path) -> None:
+    """If a row has no dataset URL, it should inherit the last one seen."""
+    f = tmp_path / "urls.txt"
+    f.write_text(
+        "https://code1,https://dataset1,https://model1\n"  # This dataset should be remembered
+        ",,https://model2\n"                             # This model should get dataset1
+        "https://code3,,https://model3\n"                 # This model should also get dataset1
+        ",https://dataset2,https://model4\n"              # A new dataset is introduced
+        ",,https://model5\n",                             # This model should get dataset2
+        encoding="utf-8",
+    )
+    result = parse_input_file(f)
+    assert result == [
+        ("https://code1", "https://dataset1", "https://model1"),
+        (None, "https://dataset1", "https://model2"),
+        ("https://code3", "https://dataset1", "https://model3"),
+        (None, "https://dataset2", "https://model4"),
+        (None, "https://dataset2", "https://model5"),
     ]
 
-
-def test_run_nonexistent_file_returns_one(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """run() should print an error (to stderr) and return 1 when file is missing."""
-    missing = tmp_path / "nope.txt"
-    exit_code = run([str(missing)])
-    captured = capsys.readouterr()
-    assert exit_code == 1
-    assert "Error:" in captured.err
+def test_parse_input_file_missing_file_raises(tmp_path: Path) -> None:
+    """parse_input_file should raise FileNotFoundError if the file is missing."""
+    missing = tmp_path / "does_not_exist.txt"
+    with pytest.raises(FileNotFoundError):
+        parse_input_file(missing)

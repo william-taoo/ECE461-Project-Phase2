@@ -1,55 +1,62 @@
+# CLI_Parser.py 
+
 import argparse
 from pathlib import Path
 import sys
-from typing import Optional
+from typing import List, Tuple, Optional
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="trustworthy-cli",
         description=(
-            "Read a URL file where each line is either a single URL "
-            "or a CSV triple: <code_url>, <dataset_url>, <model_url>. "
-            "Prints a flat list of URLs to stdout."
+            "Read a URL file and process the model, code, and dataset URLs."
         )
     )
     p.add_argument("url_file", type=Path, help="Path to a text file containing URLs.")
     return p
 
-def read_urls(path: Path) -> list[str]:
-    urls: list[str] = []
+def parse_input_file(path: Path) -> List[Tuple[Optional[str], Optional[str], str]]:
+    """
+    Parses the URL file, handling blank fields and shared datasets.
+
+    Returns:
+        A list of tuples, where each tuple is (code_url, dataset_url, model_url).
+    """
+    parsed_data = []
+    last_seen_dataset: Optional[str] = None
+
     with path.open("r", encoding="utf-8") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line:
+        for line in f:
+            line = line.strip()
+            if not line or not "," in line:
+                continue # Skip empty or non-csv lines
+
+            parts = [p.strip() for p in line.split(",", 2)]
+            
+            # Ensure we always have 3 parts to unpack
+            while len(parts) < 3:
+                parts.append("")
+            
+            code_url, dataset_url, model_url = parts
+
+            # Rule: A model URL is required.
+            if not model_url:
+                # print(f"Warning: Skipping row with no model URL: {line}", file=sys.stderr)
                 continue
-            if "," in line:
-                parts = [p.strip() for p in line.split(",", 2)]
-                while len(parts) < 3:
-                    parts.append("")
-                code, dataset, model = parts
-                if code:
-                    urls.append(code)
-                if dataset:
-                    urls.append(dataset)
-                if model:
-                    urls.append(model)
-                else:
-                    # Optional: warn about skipped row
-                    # print("Warning: row missing model URL; skipping.", file=sys.stderr)
-                    pass
+
+            # Rule: If a dataset is provided, it becomes the new "last seen"
+            if dataset_url:
+                last_seen_dataset = dataset_url
+            # Rule: If no dataset is provided, use the last one we saw
             else:
-                urls.append(line)
-    return urls
+                dataset_url = last_seen_dataset
 
-def run(argv: Optional[list[str]] = None) -> int:
-    try:
-        ns = build_parser().parse_args(argv)
-        for url in read_urls(ns.url_file):
-            sys.stdout.write(url + "\n")
-        return 0
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+            # Store the final tuple for this model. Use None for empty strings.
+            parsed_data.append((
+                code_url if code_url else None,
+                dataset_url if dataset_url else None,
+                model_url
+            ))
+            
+    return parsed_data
 
-if __name__ == "__main__":
-    raise SystemExit(run())

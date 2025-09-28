@@ -48,7 +48,7 @@ def run_tests_and_coverage():
         coverage_percent = 0
 
 
-    summary_message = f"{passed_count}/{total_count} test cases passed. {coverage_percent}% line coverage achieved. "
+    summary_message = f"{passed_count}/{total_count} test cases passed. {coverage_percent}% line coverage achieved."
     print(summary_message)
     
     # --- Clean up report files ---
