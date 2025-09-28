@@ -6,7 +6,7 @@ from unicodedata import category
 from dotenv import load_dotenv
 import requests
 from URL_handler import URLHandler
-from CLI_parser import read_urls
+from CLI_parser import parse_input_file
 
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
 os.environ['HF_HUB_VERBOSITY'] = 'error'
@@ -164,7 +164,7 @@ def main():
 
     url_file_path = sys.argv[1]
 
-    urls = read_urls(Path(url_file_path))
+    urls = parse_input_file(Path(url_file_path))
 
     models = URLHandler.process_urls(urls)
 
