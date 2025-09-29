@@ -10,7 +10,12 @@ class LLMQuerier:
             "Content-Type": "application/json"
         }
 
+
     def query(self, prompt, model="llama4:latest"):
+        """
+        Query the LLM with a prompt
+        Return the response.
+        """
         payload = {
             "model": model,
             "messages": [

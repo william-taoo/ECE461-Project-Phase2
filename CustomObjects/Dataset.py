@@ -10,16 +10,15 @@ class Dataset:
     def __init__(self, dataset_url, model_url) -> None:
         self.dataset_url = dataset_url
         self.model_url = model_url
-        # availability: URL present -> 1.0, else 0.0
-        # might need to change this later to parse README or files for reference to a dataset instead of relying on url
-        self.dataset_availability: float = 1.0 if dataset_url else 0.0
-        self.quality: float = 0.0  # filled by get_quality()
+        self.dataset_availability: float = 1.0 if dataset_url else 0.0 # availability: URL present -> 1.0, else 0.0
+        self.quality: float = 0.0
 
 
     def hf_popularity_score(self, repo_id: str) -> float:
         """
         Compute a popularity score in [0,1] from HF downloads and likes
         using simple log normalization against fixed baselines.
+        Returns float in [0,1].
         """
         downloads = 0
         likes = 0
@@ -53,10 +52,13 @@ class Dataset:
 
         return float(dnld_weight * dl_score + like_weight * like_score)
 
+
     def extract_training_data_info(self, model_url: str) -> Optional[str]:
         """
         Fetch README.md for a Hugging Face *model* and return the section
-        describing training data/datasets. Returns None if not found.
+        describing training data/datasets.
+        Returns None if not found or not a HF model.
+        Returns a string snippet from README if found.
         """
         parsed = urlparse(model_url)
         if "huggingface.co" not in parsed.netloc:
@@ -99,6 +101,7 @@ class Dataset:
         end = min(len(text), m.end() + 1200)
         return text[start:end]
 
+
     def score_with_llm(self, section_text: str, api_key: str) -> Optional[float]:
         """
         Use LLM to score dataset quality from the README snippet.
@@ -120,11 +123,12 @@ class Dataset:
 
         return float(response)
 
+
     def get_quality(self, api_key: str) -> float:
         """
         Calculate dataset_quality score from two metrics:
-          1) Popularity (if self.dataset_url is an HF dataset)
-          2) LLM score from model README (if model_url provided and training section found in README)
+            1) Popularity (if self.dataset_url is an HF dataset)
+            2) LLM score from model README (if model_url provided and training section found in README)
         Combine when both exist: 0.5 * LLM + 0.5 * Popularity
         Otherwise use whichever is available.
         """
@@ -135,7 +139,7 @@ class Dataset:
         # Popularity (HF dataset URL only)
         popularity_score = None
         if self.dataset_url and "huggingface.co/datasets/" in self.dataset_url:
-            # extract 'owner/name' inline (keep logic local to get_quality)
+            # extract 'owner/name' inline
             parts = [p for p in urlparse(self.dataset_url).path.strip("/").split("/") if p]
             try:
                 i = parts.index("datasets")
@@ -152,7 +156,7 @@ class Dataset:
             if section:
                 llm_score = self.score_with_llm(section, api_key)
 
-        # Combine
+        # Combine scores
         if llm_score is not None and popularity_score is not None:
             self.quality = float(0.5 * llm_score + 0.5 * popularity_score)
         elif llm_score is not None:

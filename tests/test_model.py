@@ -39,14 +39,14 @@ def test_compute_net_score(model: Model) -> None:
     model.dataset.get_quality = MagicMock(return_value=1)
     model.code.get_quality = MagicMock(return_value=1)
     model.get_performance_claims = MagicMock(return_value=1)
-    
+
     # Mock availability attributes
     model.dataset.dataset_availability = 1
     model.code.code_availability = 1
 
     # The expected score is the sum of all weights, since all metric values are 1
     expected_net_score = 0.25 + 0.05 + 0.15 + 0.195 + 0.025 + 0.005 + 0.025 + 0.30
-    
+
     # Compute the net score
     net_score = model.compute_net_score(api_key="dummy_key")
 
@@ -81,7 +81,7 @@ def test_concurrency_in_compute_net_score(model: Model) -> None:
     end_time = time.time()
 
     total_time = end_time - start_time
-    
+
     # If the functions ran sequentially, total_time would be ~ sleep_time * num_functions
     # If they ran concurrently, total_time should be just over sleep_time
     assert total_time < sleep_time * num_functions
@@ -99,7 +99,7 @@ def test_get_name_and_category_and_time_metric() -> None:
     m3 = Model(model_url='', dataset_url='', code_url='c')
     assert m3.get_category() == 'CODE'
 
-    res, lat = m._time_metric(lambda: 123)
+    res, lat = m.time_metric(lambda: 123)
     assert res == 123
     assert isinstance(lat, int)
 
@@ -220,7 +220,7 @@ def test_get_performance_claims_non_numeric(monkeypatch: Any) -> None:
 def test_compute_net_score_combination(monkeypatch: any) -> None:
     m = Model(model_url='https://huggingface.co/owner/model', dataset_url='d', code_url='c')
     # monkeypatch metric methods
-    m._time_metric = lambda func, *args, **kwargs: (func() if callable(func) else func, 5)
+    m.time_metric = lambda func, *args, **kwargs: (func() if callable(func) else func, 5)
 
     m.get_size = lambda: {'a': 1.0}
     m.get_license = lambda: 1.0

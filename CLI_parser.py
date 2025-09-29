@@ -1,11 +1,18 @@
-# CLI_Parser.py 
+# CLI_Parser.py
 
 import argparse
 from pathlib import Path
 import sys
 from typing import List, Tuple, Optional
 
+
 def build_parser() -> argparse.ArgumentParser:
+    """
+    Builds the argument parser for the CLI.
+
+    Returns:
+        An argparse.ArgumentParser instance.
+    """
     p = argparse.ArgumentParser(
         prog="trustworthy-cli",
         description=(
@@ -14,6 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("url_file", type=Path, help="Path to a text file containing URLs.")
     return p
+
 
 def parse_input_file(path: Path) -> List[Tuple[Optional[str], Optional[str], str]]:
     """
@@ -32,16 +40,15 @@ def parse_input_file(path: Path) -> List[Tuple[Optional[str], Optional[str], str
                 continue # Skip empty or non-csv lines
 
             parts = [p.strip() for p in line.split(",", 2)]
-            
+
             # Ensure we always have 3 parts to unpack
             while len(parts) < 3:
                 parts.append("")
-            
+
             code_url, dataset_url, model_url = parts
 
             # Rule: A model URL is required.
             if not model_url:
-                # print(f"Warning: Skipping row with no model URL: {line}", file=sys.stderr)
                 continue
 
             # Rule: If a dataset is provided, it becomes the new "last seen"
@@ -57,6 +64,6 @@ def parse_input_file(path: Path) -> List[Tuple[Optional[str], Optional[str], str
                 dataset_url if dataset_url else None,
                 model_url
             ))
-            
+
     return parsed_data
 

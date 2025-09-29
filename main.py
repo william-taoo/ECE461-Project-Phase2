@@ -11,7 +11,12 @@ from CLI_parser import parse_input_file
 os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
 os.environ['HF_HUB_VERBOSITY'] = 'error'
 
+
 def format_output(rec: dict) -> str:
+    '''
+    Formats the output for a single model to match the expected output format.
+    Returns a JSON string.
+    '''
     return (
         '{"name":"%s","category":"%s",'
         '"net_score":%.2f,"net_score_latency":%d,'
@@ -54,6 +59,7 @@ def setup_logging():
     - LOG_LEVEL: 0 for silent (creates a blank log file), 1 for INFO, 2 for DEBUG.
     - LOG_FILE: The path to the log file.
     """
+    # get log level from env, default to 0 (silent)
     try:
         log_level_str = os.getenv("LOG_LEVEL", "0")
         log_level = int(log_level_str)
@@ -61,9 +67,16 @@ def setup_logging():
         print(f"Warning: Invalid LOG_LEVEL '{log_level_str}'. Defaulting to 0 (silent).", file=sys.stderr)
         log_level = 0
 
+    # get log file from env, exit with error if not set
     log_file = os.getenv("LOG_FILE")
     if log_file is None:
         print("Warning: LOG_FILE environment variable is not set. Please set LOG_FILE to continue.", file=sys.stderr)
+        sys.exit(1)
+
+    # Validate the log file path, if invalid exit with error
+    p = Path(log_file)
+    if not p.exists() or p.is_dir():
+        print(f"Error: LOG_FILE '{log_file}' does not exist or is a directory.", file=sys.stderr)
         sys.exit(1)
 
     # Get the root logger and clear any handlers that may have been configured
@@ -125,10 +138,10 @@ load_dotenv()
 
 setup_logging()
 
-
 def validate_github_token() -> None:
-    """If GITHUB_TOKEN is set, verify it by hitting the GitHub API /user endpoint.
-
+    """
+    Validates the GITHUB_TOKEN environment variable if it is set.
+    If GITHUB_TOKEN is set, verify it by hitting the GitHub API /user endpoint.
     - If the token yields a 401, exit with an error (invalid token).
     - If the request fails for other reasons, print a warning but continue.
     - If no token is set, do nothing.
@@ -152,23 +165,27 @@ def validate_github_token() -> None:
 
 validate_github_token()
 
-def main():
-    api_key = os.getenv("API_KEY")
 
+def main():
+    """
+    Main entry point for the program. Parses command line arguments, processes URLs, and computes scores for each model.
+    """
+    # Get API key from environment variable, if set
+    api_key = os.getenv("API_KEY")
     if not api_key:
         print("Warning: API_KEY not set; proceeding without it.", file=sys.stderr)
 
+    # Parse command line arguments
     if len(sys.argv) != 2:
         print(f"Usage: ./{os.path.basename(__file__)} URL_FILE", file=sys.stderr)
         sys.exit(1)
 
+    # Parse the input file to get URLs and process them into Model objects
     url_file_path = sys.argv[1]
-
     urls = parse_input_file(Path(url_file_path))
-
     models = URLHandler.process_urls(urls)
 
-    # Process each model and print its scores
+    # Process each model to get metrics and print its scores
     for model in models:
         name = model.get_name()
         category = model.get_category()
