@@ -40,6 +40,8 @@ def parse_input_file(path: Path) -> List[Tuple[Optional[str], Optional[str], str
                 continue # Skip empty or non-csv lines
 
             parts = [p.strip() for p in line.split(",")]
+
+            # Exit code if more than 3 urls are found in a line
             if len(parts) > 3:
                 print(f"Too many fields in line: {line}", file=sys.stderr)
                 sys.exit(1)
