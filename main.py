@@ -17,6 +17,7 @@ def format_output(rec: dict) -> str:
     Formats the output for a single model to match the expected output format.
     Returns a JSON string.
     '''
+    size_score = rec.get("size_score", {})
     return (
         '{"name":"%s","category":"%s",'
         '"net_score":%.2f,"net_score_latency":%d,'
@@ -39,10 +40,10 @@ def format_output(rec: dict) -> str:
         rec["performance_claims"],  int(rec["performance_claims_latency"]),
         rec["license"],             int(rec["license_latency"]),
 
-        rec["size_score"]["raspberry_pi"],
-        rec["size_score"]["jetson_nano"],
-        rec["size_score"]["desktop_pc"],
-        rec["size_score"]["aws_server"],
+        size_score.get("raspberry_pi", 0.0),
+        size_score.get("jetson_nano", 0.0),
+        size_score.get("desktop_pc", 0.0),
+        size_score.get("aws_server", 0.0),
         int(rec["size_score_latency"]),
 
         rec["dataset_and_code_score"],        int(rec["dataset_and_code_score_latency"]),
