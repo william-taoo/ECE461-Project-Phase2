@@ -1,13 +1,3 @@
 https://github.com/google-research/bert, https://huggingface.co/datasets/bookcorpus/bookcorpus, https://huggingface.co/google-bert/bert-base-uncased
 ,,https://huggingface.co/parvk11/audience_classifier_model
 ,,https://huggingface.co/openai/whisper-tiny/tree/main
-https://github.com/openai/gpt-2, https://huggingface.co/datasets/openai/webtext, https://huggingface.co/openai-community/gpt2
-https://github.com/google-research/t5x, https://huggingface.co/datasets/c4, https://huggingface.co/google-t5/t5-small
-https://github.com/CompVis/stable-diffusion, https://huggingface.co/datasets/laion/laion2B-en, https://huggingface.co/stabilityai/stable-diffusion-2-1
-https://github.com/ultralytics/yolov5, https://huggingface.co/datasets/coco, https://huggingface.co/keremberke/yolov8m-table-extraction
-https://github.com/facebookresearch/fairseq, https://huggingface.co/datasets/glue, https://huggingface.co/roberta-base
-https://github.com/huggingface/distilbert, https://huggingface.co/datasets/wikitext, https://huggingface.co/distilbert/distilbert-base-uncased
-https://github.com/facebookresearch/XLM, https://huggingface.co/datasets/cc100, https://huggingface.co/xlm-roberta-base
-https://github.com/openai/CLIP, https://huggingface.co/datasets/conceptual_captions, https://huggingface.co/openai/clip-vit-large-patch14
-https://github.com/google-research/vision_transformer, https://huggingface.co/datasets/imagenet-1k, https://huggingface.co/google/vit-base-patch16-224
-https://github.com/bigscience-workshop/petals, https://huggingface.co/datasets/bigscience/the_pile_deduplicated, https://huggingface.co/bigscience/bloom
