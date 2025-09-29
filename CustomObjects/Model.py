@@ -279,6 +279,13 @@ class Model:
 
         llm_score = float(response) if response else 0.0
 
+        # If we couldn't determine popularity (popularity_score == 0.0),
+        # prefer the LLM-only score. This makes the metric usable when HF
+        # metadata is unavailable or the API fails (tests typically mock
+        # only the LLMQuerier).
+        if popularity_score == 0.0:
+            return float(llm_score)
+
         final_score = (0.8 * popularity_score) + (0.2 * llm_score)
 
         return float(final_score)
