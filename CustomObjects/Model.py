@@ -305,7 +305,7 @@ class Model:
         # Parse the URL to get the repository ID
         path_parts = urlparse(self.url).path.strip('/').split('/')
         if len(path_parts) < 2:
-            return {}
+            return 0.0
         repo_id = f"{path_parts[0]}/{path_parts[1]}"
 
         try:
