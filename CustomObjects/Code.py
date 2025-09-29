@@ -2,20 +2,21 @@ from urllib.parse import urlparse
 import os
 import git
 import tempfile
-
-from flake8.api import legacy as flake8  # requires flake8 installed
-
+import sys
+from flake8.api import legacy as flake8
 
 class Code:
     def __init__(self, code_url) -> None:
         self.code_url = code_url
-        # availability: URL present -> 1.0, else 0.0
-        # might need to change this later to parse README or files for reference to a dataset instead of relying on url
-        self.code_availability: float = 1.0 if code_url else 0.0
+        self.code_availability: float = 1.0 if code_url else 0.0 # availability: URL present -> 1.0, else 0.0
         self.quality: float = 0.0
 
+
     def count_python_loc(self, root: str) -> int:
-        """Count total lines across all .py files under root."""
+        """
+        Count total lines across all .py files under root.
+        Returns the total line count.
+        """
         total = 0
         for dirpath, _, filenames in os.walk(root):
             for name in filenames:
@@ -31,11 +32,12 @@ class Code:
                     continue
         return total
 
-    def run_flake8(self, root: str) -> int:
-        """Run flake8 on root and return total error/warning count."""
-        import sys, os
-        from flake8.api import legacy as flake8
 
+    def run_flake8(self, root: str) -> int:
+        """
+        Run flake8 on root
+        Return total error/warning count.
+        """
         style = flake8.get_style_guide(quiet=2)
 
         # Temporarily silence stdout
@@ -52,20 +54,20 @@ class Code:
     def get_quality(self) -> float:
         """
         Code quality metric:
+        - Clone the repository.
+        - Run static analysis (Flake8) on Python files.
+        - Let LinesOfCode = total lines across all .py files.
+        - Let ErrorCount = total Flake8 issues.
 
-          - Clone the repository.
-          - Run static analysis (Flake8) on Python files.
-          - Let LinesOfCode = total lines across all .py files.
-          - Let ErrorCount = total Flake8 issues.
+        Score = max(0, 1 - LinesOfCode / (ErrorCount * 5))
 
-          Score = max(0, 1 - LinesOfCode / (ErrorCount * 5))
+        Special cases:
+        - If no code_url or unsupported host -> 0.0
+        - If clone fails or no Python files -> 0.0
+        - If ErrorCount == 0 and there are Python files -> 1.0
 
-          Special cases:
-            - If no code_url or unsupported host -> 0.0
-            - If clone fails or no Python files -> 0.0
-            - If ErrorCount == 0 and there are Python files -> 1.0
+        Returns a float in [0,1].
         """
-
         if not self.code_url:
             self.quality = 0.0
             return self.quality
@@ -94,7 +96,7 @@ class Code:
                     self.quality = 1.0
                     return self.quality
 
-                # --- DYNAMIC MULTIPLIER LOGIC ---
+                # Dynamic penalty multiplier based on project size:
                 # The penalty multiplier changes based on the total lines of code.
                 # Smaller projects are penalized more heavily for each error.
                 if loc < 500:

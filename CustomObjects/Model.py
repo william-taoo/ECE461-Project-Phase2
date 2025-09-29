@@ -61,7 +61,13 @@ class Model:
         self.code_quality_latency = 0
         self.net_score_latency = 0
 
+
     def get_name(self) -> str:
+        """
+        Extracts the model name from the URL.
+        Returns:
+            a string name, or 'unknown-name' if it cannot be determined.
+        """
         try:
             parsed_url = urlparse(self.url)
             path_parts = parsed_url.path.strip('/').split('/')
@@ -79,21 +85,36 @@ class Model:
         elif self.code_url:
             return 'CODE'
         return 'unknown-category'
-    
-    def _time_metric(self, metric_func: Callable[..., Any], *args: Any, **kwargs: Any) -> Tuple[Any, int]:
+
+    def time_metric(self, metric_func: Callable[..., Any], *args: Any, **kwargs: Any) -> Tuple[Any, int]:
+        """
+        Measure the time taken by a metric function.
+        Args:
+            metric_func: The metric function to be timed.
+            *args: Positional arguments to pass to the metric function.
+            **kwargs: Keyword arguments to pass to the metric function.
+        Returns:
+            A tuple of (result, latency_ms)
+        """
         # Return latency of metric functions
         start_time = time.perf_counter()
         result = metric_func(*args, **kwargs)
         end_time = time.perf_counter()
         latency_ms = round((end_time - start_time) * 1000)
+
         return result, latency_ms
 
     def get_size(self) -> Dict[str, float]:
+        """
+        Get the size scores for different devices based on the model's file sizes.
+        Returns:
+            A dictionary mapping device names to their size scores.
+        """
         thresholds: Dict[str, int] = {
             'raspberry_pi': 1 * 1024**3,  # 1 GB
             'jetson_nano': 2 * 1024**3,   # 2 GB
-            'desktop_pc': 16 * 1024**3,  # 16 GB
-            'aws_server': float('inf')       # no limit
+            'desktop_pc': 16 * 1024**3,   # 16 GB
+            'aws_server': float('inf')    # no limit
         }
         scores: Dict[str, float] = {}
 
@@ -131,6 +152,11 @@ class Model:
 
 
     def get_license(self) -> float:
+        """
+        Get the license score for the model.
+        Returns:
+            A float representing the license score (1.0 for compatible licenses, 0.0 otherwise).
+        """
         compatible_licenses = ['mit', 'bsd', 'lgpl', 'apache-2.0']
         # Use the HfApi to fetch only the README file
         api = HfApi()
@@ -159,12 +185,12 @@ class Model:
             )
             with open(license_filepath, 'r', encoding='utf-8') as f:
                 license_content = f.read().lower()
-            
+
             for lic in compatible_licenses:
                 if lic in license_content:
                     print("Found compatible license in LICENSE file.")
                     return 1.0
-                
+
         except Exception as e:
             pass
 
@@ -193,28 +219,32 @@ class Model:
                 return 1.0
 
         return 0.0
-    
+
     def get_popularity_score(self) -> float:
-        """Helper function to calculate a score based on likes and downloads."""
+        """
+        Get the popularity score for the model.
+        Returns:
+            A float representing the popularity score (1.0 for high popularity, 0.0 for low popularity).
+        """
         try:
             path_parts = urlparse(self.url).path.strip('/').split('/')
             if len(path_parts) < 2:
                 return 0.0
             repo_id = f"{path_parts[0]}/{path_parts[1]}"
-            
+
             api = HfApi()
             model_info = api.model_info(repo_id=repo_id)
-            
+
             downloads = model_info.downloads or 0
             likes = model_info.likes or 0
-            
+
             # Normalize scores on a logarithmic scale
             # A score of 1.0 is achieved at 1,000,000 downloads or 1,000 likes
             dwnlds = 100000
             lks = 1000
             download_score = min(1.0, math.log10(downloads + 1) / math.log10(dwnlds))
             like_score = min(1.0, math.log10(likes + 1) / math.log10(lks))
-            
+
             # Weighted average of the two popularity metrics
             popularity_score = (0.7 * download_score) + (0.3 * like_score)
             return popularity_score
@@ -235,7 +265,6 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-
         popularity_score = self.get_popularity_score()
 
         llm_querier = LLMQuerier(endpoint="https://genai.rcac.purdue.edu/api/chat/completions", api_key=api_key)
@@ -246,7 +275,6 @@ class Model:
             "If the README or documentation contains only headers without meaningful text return a low score."
             "Provide only the numeric score as output, without any additional text or explanation."
         )
-        # print("prompt:", prompt)
         response = llm_querier.query(prompt=prompt)
 
         llm_score = float(response) if response else 0.0
@@ -267,7 +295,6 @@ class Model:
             A float score between 0.0 and 1.0. Returns 0.0 if the repository
             cannot be cloned or has no recent commits.
         """
-
         # Parse the URL to get the repository ID
         path_parts = urlparse(self.url).path.strip('/').split('/')
         if len(path_parts) < 2:
@@ -275,30 +302,30 @@ class Model:
         repo_id = f"{path_parts[0]}/{path_parts[1]}"
 
         try:
-            # 1. Instantiate the API client and fetch commits
+            # Instantiate the API client and fetch commits
             # api = HfApi()
             commits = list_repo_commits(repo_id=repo_id)
-            
-            # 2. Define the time window (last 365 days)
+
+            # Define the time window (last 365 days)
             years = 2.5
             year_limit = datetime.now().astimezone() - timedelta(days=365*years)
-            
-            # 3. Filter commits from the last year and get author names
+
+            # Filter commits from the last year and get author names
             recent_authors = []
             for commit in commits:
                 if commit.created_at > year_limit:
                     for author in commit.authors:
                         recent_authors.append(author)
-            
+
             if not recent_authors:
                 return 0.0
-                
+
             total_commits = len(recent_authors)
-            
-            # 4. Count commits per author
+
+            # Count commits per author
             commit_counts = Counter(recent_authors)
-            
-            # 5. Identify significant authors (>4% of commits)
+
+            # Identify significant authors (>4% of commits)
             percent_of_commits = 4.0
             significant_authors_count = 0
             for author, count in commit_counts.items():
@@ -306,11 +333,11 @@ class Model:
                 if contribution_percentage > percent_of_commits:
                     significant_authors_count += 1
 
-            # 6. Calculate the final score (capped at 1.0)
+            # Calculate the final score (capped at 1.0)
             min_total_contributors = 5.0
             score = min(1.0, significant_authors_count / min_total_contributors)
             return score
-        
+
         except Exception as e:
             return 0.0
 
@@ -321,6 +348,9 @@ class Model:
         Score is a single float in [0,1] returned by the LLM.
         The LLM is given the model URL and ask for a numeric-only assessment of how well
         performance/evaluation/benchmarks are documented.
+        Returns:
+            A float score between 0.0 and 1.0. Returns 0.0 if the repository
+            cannot be cloned or has no recent commits.
         """
         llm_querier = LLMQuerier(
             endpoint="https://genai.rcac.purdue.edu/api/chat/completions",
@@ -345,26 +375,32 @@ class Model:
 
     def get_dataset_and_code_score(self) -> float:
         """
-        Averages the dataset and code availability scores.
-
+        Calculates the dataset and code availability score for the model.
+        Returns:
+            A float score between 0.0 and 1.0 representing the average of
+            dataset_availability and code_availability.
         """
         dataset_availability = getattr(self.dataset, 'dataset_availability', 0.0)
         code_availability = getattr(self.code, 'code_availability', 0.0)
-        
+
         return (dataset_availability + code_availability) / 2.0
 
 
     def compute_net_score(self, api_key: str) -> float:
-
+        """
+        Computes the net score for the model by aggregating various metrics.
+        Returns:
+            A float score between 0.0 and 1.0 representing the net score.
+        """
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_size = executor.submit(self._time_metric, self.get_size)
-            future_license = executor.submit(self._time_metric, self.get_license)
-            future_ramp_up_time = executor.submit(self._time_metric, self.get_ramp_up_time, api_key=api_key)
-            future_bus_factor = executor.submit(self._time_metric, self.get_bus_factor)
-            future_performance_claims = executor.submit(self._time_metric, self.get_performance_claims, api_key=api_key)
-            future_dataset_quality = executor.submit(self._time_metric, self.dataset.get_quality, api_key=api_key)
-            future_code_quality = executor.submit(self._time_metric, self.code.get_quality)
-            future_dataset_and_code_score = executor.submit(self._time_metric, self.get_dataset_and_code_score)
+            future_size = executor.submit(self.time_metric, self.get_size)
+            future_license = executor.submit(self.time_metric, self.get_license)
+            future_ramp_up_time = executor.submit(self.time_metric, self.get_ramp_up_time, api_key=api_key)
+            future_bus_factor = executor.submit(self.time_metric, self.get_bus_factor)
+            future_performance_claims = executor.submit(self.time_metric, self.get_performance_claims, api_key=api_key)
+            future_dataset_quality = executor.submit(self.time_metric, self.dataset.get_quality, api_key=api_key)
+            future_code_quality = executor.submit(self.time_metric, self.code.get_quality)
+            future_dataset_and_code_score = executor.submit(self.time_metric, self.get_dataset_and_code_score)
 
             self.size_score, self.size_score_latency = future_size.result()
             self.license_score, self.license_latency = future_license.result()
