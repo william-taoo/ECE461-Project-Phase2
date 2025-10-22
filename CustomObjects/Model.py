@@ -379,6 +379,15 @@ class Model:
             return max(0.0, min(1.0, float(response)))
         except Exception:
             return 0.0
+        
+    def get_reproducibility(self) -> float:
+        pass
+
+    def get_reviewedness(self) -> float:
+        pass
+
+    def get_treescore(self) -> float:
+        pass
 
     def get_dataset_and_code_score(self) -> float:
         """
