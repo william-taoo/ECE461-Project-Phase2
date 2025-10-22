@@ -12,3 +12,5 @@ flake8
 python-dotenv
 boto3
 transformers
+Flask
+flask-cors
