@@ -1,9 +1,14 @@
 # ECE461 Project - Fall 2025
 
-## Group Members:
+## Group Members (Phase 1):
 - Akash Kumar
 - Alexis Haas
 - Ishana Thakre
+
+## Group Members (Phase 2):
+- William Tao
+- Piotr Nabrzyski
+- Donny Weintz
 
 ## Project Setup:
 1. Clone the repository
