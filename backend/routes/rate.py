@@ -1,5 +1,10 @@
 from flask import Blueprint, jsonify
-from utils.registry_utils import load_registry, save_registry
+from utils.registry_utils import (
+    load_registry,
+    save_registry,
+    find_model_in_registry
+)
+from backend.app import REGISTRY_PATH
 
 rate_bp = Blueprint("rate", __name__)
 
@@ -16,13 +21,21 @@ def rate_model(model_id):
     - Treescore: Average of the total model scores of all parents
     of the model
     '''
-    registry = load_registry()
+    registry = load_registry(REGISTRY_PATH)
+
+    # Check if model is in registry
+    model = find_model_in_registry(registry, model_id)
+    if not model:
+        return jsonify({"error": "Model not found"}), 404
+
     # Get model and rate using phase 1 metrics
+    scores = 0 
 
     # Save scores to registry
-    save_registry(registry)
+    model["scores"] = scores
+    save_registry(REGISTRY_PATH, registry)
 
     return jsonify({
         "model_id": model_id,
-        # "scores": scores
+        "scores": scores
     })
