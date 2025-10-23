@@ -10,6 +10,9 @@ import re
 from huggingface_hub import HfApi, list_repo_commits
 from urllib.parse import urlparse
 import time
+import os
+import subprocess
+import tempfile
 
 class Model:
     url: str
@@ -380,44 +383,96 @@ class Model:
         except Exception:
             return 0.0
         
-    def get_reproducibility(self) -> float:
+    def get_reproducibility(self) -> float: 
+        """
+        Calculates the reproducibility score for the model based on 
+        demonstraton code included in the model card.
+
+        The reproducibility is scored on a scale of 0.0 to 1.0. It is based on the
+        presence of demo code in the model README. If there is no code or the code 
+        doesn't run, the score is 0.0. If it runs, but encounters some error or 
+        needs debugged, the score is 0.5. If it runs successfully with no errors, 
+        the score is 1.0.
+
+        Returns:
+            A float score between 0.0 and 1.0.
+        """
+
         self.reproducibility_score = 0.0
-        
-        # parse the URL to get the repository ID
         api = HfApi()
+
+        # parse the URL to get the repository ID
         path_parts = urlparse(self.url).path.strip('/').split('/')
         if len(path_parts) < 2:
             return 0.0
         repo_id = f"{path_parts[0]}/{path_parts[1]}"
 
         try:
-            # get model metadata
-            model_info = api.model_info(repo_id)
-            card_data = model_info.cardData
-            
             # extract model README
             readme_path = api.hf_hub_download(repo_id=repo_id, filename="README.md")
             with open(readme_path, "r", encoding="utf-8") as f:
                 readme_text = f.read()
 
-            # try to locate python demo code in model card
-            code_blocks = re.findall(r"```python(.*?)```", readme_text, re.DOTALL)
-            if not code_blocks:
-                print(f"[{repo_id}] No Python code examples found in README.")
-            demo_code = code_blocks[0].strip()
-            print(demo_code)
+            # try to locate demo code in model card
+            all_blocks = re.findall(r"```python(.*?)```", readme_text, re.DOTALL)
+            if not all_blocks:
+                return 0.0
 
-            # create a temp directory to test demo code
+            # filter out code blocks that aren't python
+            valid_blocks = []
+            for block in all_blocks:
+                cleaned_lines = []
+                for line in block.splitlines():
+                    line = line.strip()
+                    # only keep lines that *start* with >>> or ...
+                    if re.match(r"^(>>>|\.\.\.)\s?", line):
+                        # Remove the REPL prefix before adding
+                        line = re.sub(r"^(>>>|\.\.\.)\s?", "", line)
+                        cleaned_lines.append(line)
+                cleaned = "\n".join(cleaned_lines).strip()
 
-
-            # try to run code
-
-
-            # assess outcome and compute score
-
+                # Keep code blocks that start with import/from
+                if cleaned and re.match(r"^(import|from)\s+\w+", cleaned):
+                    valid_blocks.append(cleaned)
             
+            # return 0 if no valid demo code is found
+            if not valid_blocks:
+                return 0.0
+
+            # run the first valid code block
+            demo_code = valid_blocks[0].strip()
+            
+            # create a temp directory to test demo code
+            with tempfile.TemporaryDirectory() as tmpdir:
+                demo_file = os.path.join(tmpdir, "demo.py")
+                with open(demo_file, "w", encoding="utf-8") as f:
+                    f.write(demo_code)
+                
+                # try running the code (timeout after 60 seconds)
+                try:
+                    result = subprocess.run(
+                        ["python3", demo_file],
+                        capture_output=True,
+                        text=True,
+                        timeout=60
+                    )
+                    # ran successfully -> score = 1.0
+                    if result.returncode == 0:
+                        self.reproducibility_score = 1.0
+                    
+                    # run failure -> score = 0.5
+                    else:
+                        self.reproducibility_score = 0.5
+                
+                # timeout or other exception/runtime error -> score = 0.5
+                except subprocess.TimeoutExpired:
+                    self.reproducibility_score = 0.5
+                except Exception as e:
+                    self.reproducibility_score = 0.5
+
+        # any other exception -> score = 0.0
         except Exception as e:
-            pass
+            self.reproducibility_score = 0.0
 
         return self.reproducibility_score
 
