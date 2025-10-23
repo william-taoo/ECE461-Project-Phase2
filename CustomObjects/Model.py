@@ -381,7 +381,45 @@ class Model:
             return 0.0
         
     def get_reproducibility(self) -> float:
-        pass
+        self.reproducibility_score = 0.0
+        
+        # parse the URL to get the repository ID
+        api = HfApi()
+        path_parts = urlparse(self.url).path.strip('/').split('/')
+        if len(path_parts) < 2:
+            return 0.0
+        repo_id = f"{path_parts[0]}/{path_parts[1]}"
+
+        try:
+            # get model metadata
+            model_info = api.model_info(repo_id)
+            card_data = model_info.cardData
+            
+            # extract model README
+            readme_path = api.hf_hub_download(repo_id=repo_id, filename="README.md")
+            with open(readme_path, "r", encoding="utf-8") as f:
+                readme_text = f.read()
+
+            # try to locate python demo code in model card
+            code_blocks = re.findall(r"```python(.*?)```", readme_text, re.DOTALL)
+            if not code_blocks:
+                print(f"[{repo_id}] No Python code examples found in README.")
+            demo_code = code_blocks[0].strip()
+            print(demo_code)
+
+            # create a temp directory to test demo code
+
+
+            # try to run code
+
+
+            # assess outcome and compute score
+
+            
+        except Exception as e:
+            pass
+
+        return self.reproducibility_score
 
     def get_reviewedness(self) -> float:
         pass
