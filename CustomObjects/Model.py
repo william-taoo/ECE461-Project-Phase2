@@ -11,8 +11,8 @@ from huggingface_hub import HfApi, list_repo_commits
 from urllib.parse import urlparse
 import time
 import os
-import subprocess
-import tempfile
+# import subprocess
+# import tempfile
 
 class Model:
     url: str

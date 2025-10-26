@@ -14,5 +14,3 @@ boto3
 transformers
 Flask
 flask-cors
-tempfile
-subprocess
