@@ -11,7 +11,7 @@ class LLMQuerier:
         }
 
 
-    def query(self, prompt, model="llama4:latest"):
+    def query(self, prompt, model="deepseek-r1:7b"):
         """
         Query the LLM with a prompt
         Return the response.
