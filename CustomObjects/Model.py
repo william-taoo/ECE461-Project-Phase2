@@ -13,6 +13,7 @@ import time
 import os
 import subprocess
 import tempfile
+import requests
 
 class Model:
     url: str
@@ -477,7 +478,128 @@ class Model:
         return self.reproducibility_score
 
     def get_reviewedness(self) -> float:
-        pass
+        """
+        Computes the reviewedness metric for the associated GitHub repository.
+
+        Definition: fraction of all *code* (not weights) that was
+        introduced via pull requests which had a code review. If there is no
+        linked GitHub repository, return -1.0.
+        """
+        code_url = getattr(self, "code_url", None) or ""
+        parsed = urlparse(code_url)
+        if "github.com" not in (parsed.netloc or ""):
+            return -1
+
+        # get {owner}/{repo}
+        try:
+            parts = parsed.path.strip("/").split("/")
+            owner, repo = parts[0], parts[1].replace(".git", "")
+        except Exception:
+            return -1.0
+        
+        session = requests.Session()
+        token = os.getenv("GITHUB_TOKEN", "").strip()
+        headers = {
+            "Accept": "application/vnd.github+json",
+            **({"Authorization": f"Bearer {token}"} if token else {}),
+        }
+
+        # reviewedness specific helpers to decide whether a file counts as code instead of weights
+        code_exts = {
+            ".py", ".ipynb", ".js", ".ts", ".jsx", ".tsx",
+            ".java", ".c", ".cc", ".cpp", ".h", ".hpp",
+            ".go", ".rs", ".rb", ".swift", ".kt", ".m", ".mm",
+            ".sh", ".ps1", ".r", ".jl",
+            ".yml", ".yaml", ".json", ".toml", ".ini", ".cfg", ".mk",
+            ".sql", ".pl"
+        }
+        non_code_or_weight_exts = {
+            ".bin", ".safetensors", ".pt", ".pth", ".onnx",
+            ".h5", ".ckpt", ".tflite", ".pb", ".weights",
+            ".tar", ".gz", ".zip", ".xz", ".7z", ".rar",
+            ".parquet", ".feather", ".arrow", ".npz", ".npy",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp",
+            ".pdf", ".docx", ".pptx", ".xls", ".xlsx",
+            ".ipynb_checkpoints",
+        }
+
+        def is_code_file(fname: str) -> bool:
+            f = fname.lower()
+            if any(seg in f for seg in ("/weights/", "/checkpoints/", "/artifacts/", "/models/")):
+                return False
+            ext = "." + f.rsplit(".", 1)[-1] if "." in f else ""
+            if ext in non_code_or_weight_exts:
+                return False
+            # treat files with a known code/config extension as code
+            return ext in code_exts
+        
+        def get_paginated(url: str, params: dict):
+            page = 1
+            while True:
+                p = {**params, "per_page": 100, "page": page}
+                resp = session.get(url, headers=headers, params=p, timeout=15)
+                if resp.status_code >= 400:
+                    break
+                data = resp.json()
+                if not data:
+                    break
+                yield data
+                if "link" not in resp.headers or 'rel="next"' not in resp.headers["link"]:
+                    break
+                page += 1
+
+        base_url = f"https://api.github.com/repos/{owner}/{repo}"
+        merged_pr_numbers = []
+        try:
+            for page in get_paginated(f"{base_url}/pulls", {"state": "closed", "sort": "updated", "direction": "desc"}):
+                for pr in page:
+                    # pr['merged_at'] present means it was merged
+                    if pr.get("merged_at"):
+                        merged_pr_numbers.append(pr["number"])
+                    # Stop after a reasonable cap to keep runtime bounded
+                if len(merged_pr_numbers) >= 400:
+                    break
+        except Exception:
+            return 0.0
+        
+        if not merged_pr_numbers: # nothing introduced via reviewed PRs
+            return 0.0
+    
+        total_code_additions = 0
+        reviewed_code_additions = 0
+
+        # for each merged PR, check reviews and count code additions
+        for pr_number in merged_pr_numbers:
+            try:
+                # look for approved review
+                rev_ok = False
+                rev_resp = session.get(f"{base_url}/pulls/{pr_number}/reviews", headers=headers, timeout=15)
+                if rev_resp.status_code < 400:
+                    for r in rev_resp.json():
+                        # States: COMMENTED, APPROVED, CHANGES_REQUESTED, DISMISSED
+                        if (r.get("state") or "").upper() == "APPROVED":
+                            rev_ok = True
+                            break
+                # add up additions for code files
+                pr_files_addition = 0
+                for page in get_paginated(f"{base_url}/pulls/{pr_number}/files", {}):
+                    for f in page:
+                        fname = f.get("filename") or ""
+                        if is_code_file(fname):
+                            # additions field counts added lines in that file within the PR
+                            pr_files_additions += int(f.get("additions") or 0)
+                total_code_additions += pr_files_additions
+                if rev_ok:
+                    reviewed_code_additions += pr_files_additions    
+
+            except Exception:
+                continue
+        
+        if total_code_additions <= 0:
+            return 0.0
+        
+        reviewedness = reviewed_code_additions / float(total_code_additions)
+        return max(0.0, min(1.0, reviewedness))
 
     def get_treescore(self) -> float:
         pass
