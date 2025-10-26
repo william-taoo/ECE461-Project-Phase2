@@ -11,7 +11,7 @@ class LLMQuerier:
         }
 
 
-    def query(self, prompt, model="deepseek-r1:7b"):
+    def query(self, prompt, model="gpt-oss:120b"):
         """
         Query the LLM with a prompt
         Return the response.
