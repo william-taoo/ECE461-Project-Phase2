@@ -3,33 +3,25 @@ import { Button, Modal, Form } from "react-bootstrap";
 
 const Upload: React.FC = () => {
     const [show, setShow] = useState(false);
-    const [file, setFile] = useState<File | null>(null);
-    const [modelName, setModelName] = useState("");
+    const [modelURL, setModelURL] = useState<string>("");
 
     const handleClose = () => setShow(false);
     const handleShow = () => setShow(true);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
-
     const handleUpload = async () => {
-        if (!file || !modelName) {
-            alert("Please select a file and enter a model name.");
+        if (!modelURL) {
+            alert("Please enter a model URL.");
             return;
         }
-
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("modelName", modelName);
 
         // Link Flask Upload API
         try {
             const response = await fetch("http://localhost:5000/upload", {
                 method: "POST",
-                body: formData,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ url: modelURL }),
             });
 
             const data = await response.json()
@@ -39,8 +31,7 @@ const Upload: React.FC = () => {
             } else {
                 alert("Model uploaded successfully!");
                 handleClose(); // Close modal
-                setFile(null);
-                setModelName("");
+                setModelURL("");
             }
         } catch (err) {
             console.error("Upload failed: ", err);
@@ -69,17 +60,13 @@ const Upload: React.FC = () => {
                 <Modal.Body>
                     <Form>
                         <Form.Group className="mb-3">
-                            <Form.Label>Model Name</Form.Label>
+                            <Form.Label>Model URL</Form.Label>
                             <Form.Control
                                 type="text"
-                                value={modelName}
-                                onChange={(e) => setModelName(e.target.value)}
+                                value={modelURL}
+                                onChange={(e) => setModelURL(e.target.value)}
+                                placeholder="Ex: https://huggingface.co/google-bert/bert-base-uncased"
                             />
-                        </Form.Group>
-
-                        <Form.Group className="mb-3">
-                            <Form.Label>Model File</Form.Label>
-                            <Form.Control type="file" onChange={handleFileChange} />
                         </Form.Group>
                     </Form>
                 </Modal.Body>
