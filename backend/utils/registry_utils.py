@@ -1,5 +1,8 @@
 import json
 import os
+import uuid
+from flask import jsonify
+from backend.app import REGISTRY_PATH
 
 def load_registry(path: str):
     if not os.path.exists(path):
