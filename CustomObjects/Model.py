@@ -1,6 +1,6 @@
 import concurrent.futures
 import math
-from typing import Dict, Any, Tuple, Callable
+from typing import Dict, Any, Tuple, Callable, Optional
 from CustomObjects.Dataset import Dataset
 from CustomObjects.Code import Code
 from CustomObjects.LLMQuerier import LLMQuerier
@@ -14,6 +14,9 @@ import os
 import subprocess
 import tempfile
 import requests
+import networkx as nx
+import json
+import matplotlib.pyplot as plt
 
 class Model:
     url: str
@@ -603,6 +606,57 @@ class Model:
 
     def get_treescore(self) -> float:
         pass
+
+    def get_lineage_graph(self) -> Optional[nx.DiGraph]:
+        self.lineage_graph = None
+        api = HfApi()
+
+        # parse the URL to get the repository ID
+        path_parts = urlparse(self.url).path.strip('/').split('/')
+        if len(path_parts) < 2:
+            return None
+        repo_id = f"{path_parts[0]}/{path_parts[1]}"
+
+        try:
+            # extract model config.json
+            config_path = api.hf_hub_download(repo_id=repo_id, filename="config.json")
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+
+            # infer the base architecture
+            model_type = config_data.get("model_type", None)
+            architectures = config_data.get("architectures", [])
+
+            # create a directed graph
+            graph: nx.DiGraph = nx.DiGraph()
+
+            # add this model
+            graph.add_node(self.name)
+
+            # infer possible model lineage
+            if model_type is not None:
+                base_model_name = model_type.upper()
+                graph.add_node(base_model_name)
+                graph.add_edge(base_model_name, self.name)
+
+            # optionally add architectures if models aren't present
+            for arch in architectures:
+                graph.add_node(arch)
+                graph.add_edge(arch, self.name)
+
+            # plot the graph (ONLY FOR TESTING)
+            pos = nx.spring_layout(graph)
+            nx.draw(graph, pos, with_labels=True, node_size=3000,
+                    node_color="lightblue", font_size=10, arrowsize=20)
+            plt.title(f"Lineage Graph for {self.name}")
+            plt.show()
+
+            self.lineage_graph = graph
+    
+        except Exception as e:
+            self.lineage_graph = None
+
+        return self.lineage_graph
 
     def get_dataset_and_code_score(self) -> float:
         """
