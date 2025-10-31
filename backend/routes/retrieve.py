@@ -7,7 +7,7 @@ from backend.app import REGISTRY_PATH
 
 retrieve_bp = Blueprint("retrieve", __name__)
 
-@retrieve_bp.route("/artifact", methods=["POST"])
+@retrieve_bp.route("/artifacts", methods=["POST"])
 def get_artifacts():
     '''
     This will send a request for models in the registry 
@@ -37,8 +37,8 @@ def get_artifacts():
         name = query.get("name")
         artifact_type = query.get("type")
         for artifact in registry.values():
-            if (name == "*" or artifact["name"] == name) and \
-                (not artifact_type or artifact["type"] == artifact_type):
+            if (name == "*" or artifact["metadata"]["name"] == name) and \
+                (not artifact_type or artifact["metadata"]["type"] == artifact_type):
                 results.append(artifact)
 
     # Handle too many artifacts
