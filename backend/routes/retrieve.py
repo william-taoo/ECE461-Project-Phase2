@@ -82,3 +82,23 @@ def get_name(name: str):
         return jsonify({"error": "No artifacts found"}), 404
     
     return jsonify(results), 200
+
+@retrieve_bp.route("/artifacts/<artifact_type>/<id>", methods=["GET"])
+def get_artifact(artifact_type: str, id: str):
+    '''
+    Retrieve artifact metadata by type and id
+    '''
+    # Check authorization
+    auth_header = request.headers.get("X-Authorization")
+    if not auth_header:
+        return jsonify({"error": "Missing authentication header"}), 403
+    
+    registry = load_registry(REGISTRY_PATH)
+    artifact = registry.get(id)
+    if not artifact:
+        return jsonify({"error": "Artifact not found"}), 404
+    
+    if artifact["metadata"]["type"] != artifact_type:
+        return jsonify({"error": "Invalid artifact type"}), 400
+    
+    return jsonify(artifact), 200
