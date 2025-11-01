@@ -29,6 +29,7 @@ app.register_blueprint(remove_bp)
 def home():
     return "Hello, Flask!"
 
+
 @app.route('/tracks', methods=['GET'])
 def get_track():
     output = {
@@ -43,5 +44,7 @@ def get_track():
 
     return jsonify(output), 200
 
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=False)
