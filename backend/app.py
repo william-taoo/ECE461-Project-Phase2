@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 import os
 from routes.upload import upload_bp
@@ -15,6 +15,7 @@ CORS(app)
 
 # confiure registry path
 app.config["REGISTRY_PATH"] = REGISTRY_PATH
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
 # Register blueprints
 app.register_blueprint(upload_bp)
@@ -28,6 +29,19 @@ app.register_blueprint(remove_bp)
 def home():
     return "Hello, Flask!"
 
+@app.route('/tracks', methods=['GET'])
+def get_track():
+    output = {
+        "plannedTracks": [
+            "Performance track"
+        ]
+    }
+
+    # Simulate error somehow with 500 status error
+    if not output:
+        return jsonify({"error": "Error with getting track"}), 500
+
+    return jsonify(output), 200
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
