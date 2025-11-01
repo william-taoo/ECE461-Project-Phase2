@@ -1,9 +1,6 @@
-from flask import Blueprint, request, jsonify
-import os
-import uuid
-import requests
-from utils.registry_utils import load_registry, save_registry
-from backend.app import REGISTRY_PATH
+from flask import Blueprint, request, jsonify, current_app
+from utils.registry_utils import load_registry
+
 
 retrieve_bp = Blueprint("retrieve", __name__)
 
@@ -13,7 +10,10 @@ def get_artifacts():
     This will send a request for models in the registry 
     given a name and type
     '''
-    registry = load_registry(REGISTRY_PATH)
+
+    # Access to config for registry path
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
 
     # Header
     auth_header = request.headers.get("X-Authorization")
@@ -69,7 +69,8 @@ def get_name(name: str):
     if not name or name.strip() == "":
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
-    registry = load_registry(REGISTRY_PATH)
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
     results = []
 
     for artifact in registry.values():
@@ -93,7 +94,8 @@ def get_artifact(artifact_type: str, id: str):
     if not auth_header:
         return jsonify({"error": "Missing authentication header"}), 403
     
-    registry = load_registry(REGISTRY_PATH)
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404

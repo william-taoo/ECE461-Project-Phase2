@@ -1,6 +1,6 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, save_registry
-from backend.app import REGISTRY_PATH
+
 
 remove_bp = Blueprint("remove", __name__)
 
@@ -22,7 +22,8 @@ def reset_registry():
         }), 401
 
     default = {} # Can change to whatever default
-    save_registry(REGISTRY_PATH, default)
+    registry_path = current_app.config["REGISTRY_PATH"]
+    save_registry(registry_path, default)
    
     return jsonify({"message": "Registry has been reset"}), 200
 
@@ -39,12 +40,13 @@ def delete_artifact(artifact_type: str, id: str):
     if artifact_type == None or id == None:
         return jsonify({"error": "Missing field(s)"}), 400
     
-    registry = load_registry(REGISTRY_PATH)
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
     
     del registry[id]
-    save_registry(REGISTRY_PATH, registry)
+    save_registry(registry_path, registry)
 
     return jsonify({"message": "Artifact has been deleted"}), 200

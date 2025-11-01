@@ -1,10 +1,10 @@
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, jsonify, request, send_file, current_app
 import os
 from utils.registry_utils import (
     load_registry,
     find_model_in_registry
 )
-from backend.app import REGISTRY_PATH
+
 
 download_bp = Blueprint("download", __name__)
 
@@ -17,7 +17,8 @@ def download_model(model_id):
     - Sub aspects: weights, associated datasets, etc.
     We will get a component param, specifying what to download
     '''
-    registry = load_registry(REGISTRY_PATH)
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
 
     # Check if model is in registry
     model = find_model_in_registry(registry, model_id)
