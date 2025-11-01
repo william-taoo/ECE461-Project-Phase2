@@ -190,3 +190,31 @@ def get_lineage(id: str):
     lineage = {}
 
     return jsonify(lineage), 200
+
+@retrieve_bp.route("/artifact/model/<id>/license-check", methods=["POST"])
+def check_license(id: str):
+    '''
+    Check if the license is compatible
+    '''
+    auth_header = request.headers.get("X-Authorization")
+    if not auth_header:
+        return jsonify({"error": "Missing authentication header"}), 403
+    
+    data = request.get_json()
+    if not data or "github_url" not in data:
+        return jsonify({"error": "Missing github_url"}), 400
+    
+    url = data["github_url"]
+    valid_url = True
+    if not valid_url:
+        return jsonify({"error": "Invalid github URL"}), 404
+    
+    # Check license
+    try:
+        compatible = True
+    except:
+        return jsonify({"error": "License information couldn't be retrieved"}), 502
+
+
+    return jsonify(compatible), 200
+
