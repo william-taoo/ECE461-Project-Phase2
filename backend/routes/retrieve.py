@@ -104,3 +104,66 @@ def get_artifact(artifact_type: str, id: str):
         return jsonify({"error": "Invalid artifact type"}), 400
     
     return jsonify(artifact), 200
+
+@retrieve_bp.route("/artifact/<artifact_type>/<id>/cost", methods=["GET"])
+def get_cost(artifact_type: str, id: str):
+    '''
+    Retrieve artifact cost by type and id
+    '''
+    dependency = request.args.get("dependency", "false").lower() == "true"
+
+    # Check authorization
+    auth_header = request.headers.get("X-Authorization")
+    if not auth_header:
+        return jsonify({"error": "Missing authentication header"}), 403
+    
+    if not artifact_type or not id:
+        return jsonify({"error": "Missing field(s)"}), 400
+    
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
+    artifact = registry.get(id)
+    if not artifact:
+        return jsonify({"error": "Artifact not found"}), 404
+    
+    try:
+        if dependency == False:
+            # Return total cost
+            cost = 0 # Call function to get cost of artifact
+            return jsonify({
+                id: {
+                    "total_cost": cost
+                }
+            }), 200
+        else:
+            # Return standalone and total cost
+            results = {}
+            standalone_cost, total_cost = 0, 0 # Call function to get costs
+            # Might need to iterate through and calculate cost
+            return jsonify(results), 200
+    except Exception as e:
+        return jsonify({"error": "Error with calculating cost"}), 500
+
+@retrieve_bp.route("/artifact/<artifact_type>/<id>/audit", methods=["GET"])
+def get_audit(artifact_type: str, id: str):
+    '''
+    Get the audit log for an artifact
+    '''
+    auth_header = request.headers.get("X-Authorization")
+    if not auth_header:
+        return jsonify({"error": "Missing authentication header"}), 403
+    
+    if not artifact_type or not id:
+        return jsonify({"error": "Missing field(s)"}), 400
+    
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
+    artifact = registry.get(id)
+    if not artifact:
+        return jsonify({"error": "Artifact not found"}), 404
+    
+    # Get audit log 
+    # - go in audit and retrieve id
+    audits = []
+
+    return jsonify(audits), 200
