@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry
+import re
 
 
 retrieve_bp = Blueprint("retrieve", __name__)
@@ -218,3 +219,41 @@ def check_license(id: str):
 
     return jsonify(compatible), 200
 
+@retrieve_bp.route("/artifact/byRegEx", methods=["POST"])
+def get_by_regex():
+    '''
+    Retrieve artifacts matching name regex
+    '''
+    auth_header = request.headers.get("X-Authorization")
+    if not auth_header:
+        return jsonify({"error": "Missing authentication header"}), 403
+    
+    regex = request.get_json()
+    if not regex or "regex" not in regex:
+        return jsonify({"error": "Missing regex"}), 400
+    
+    try:
+        compiled_regex = re.compile(regex, re.IGNORECASE)
+    except re.error:
+        return jsonify({"error": "Invalid regular expression"}), 400
+    
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
+
+    matches = []
+    for artifact_id, artifact_data in registry.items():
+        metadata = artifact_data.get("metadata", {})
+        name = metadata.get("name", "")
+        artifact_type = metadata.get("type", "")
+
+        if compiled_regex.search(name):
+            matches.append({
+                "name": name,
+                "id": artifact_id,
+                "type": artifact_type
+            }) 
+
+    if not matches:
+        return jsonify({"error": "No artifacts found"}), 404
+    
+    return jsonify(matches), 200
