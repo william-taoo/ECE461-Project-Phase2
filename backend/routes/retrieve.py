@@ -167,3 +167,26 @@ def get_audit(artifact_type: str, id: str):
     audits = []
 
     return jsonify(audits), 200
+
+@retrieve_bp.route("/artifact/model/<id>/lineage", methods=["GET"])
+def get_lineage(id: str):
+    '''
+    Get the lineage graph of an artifact
+    '''
+    auth_header = request.headers.get("X-Authorization")
+    if not auth_header:
+        return jsonify({"error": "Missing authentication header"}), 403
+    
+    if not id:
+        return jsonify({"error": "Missing field"}), 400
+    
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
+    artifact = registry.get(id)
+    if not artifact:
+        return jsonify({"error": "Artifact not found"}), 404
+    
+    # Get lineage graph
+    lineage = {}
+
+    return jsonify(lineage), 200
