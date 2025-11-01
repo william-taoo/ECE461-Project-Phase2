@@ -27,7 +27,7 @@ app.register_blueprint(remove_bp)
 
 @app.route('/')
 def home():
-    return "Hello, Flask!"
+    return "Hello, Flask! Testing deployment to AWS"
 
 
 @app.route('/tracks', methods=['GET'])
@@ -47,4 +47,5 @@ def get_track():
 
 if __name__ == "__main__":
     # app.run(debug=True, port=5000)
+
     app.run(host="0.0.0.0", port=5000, debug=False)
