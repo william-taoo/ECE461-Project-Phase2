@@ -15,50 +15,59 @@ def upload_artifact():
     Receive a model via url link from frontend and
     detect the type from phase 1 code
     '''
-    registry_path = current_app.config["REGISTRY_PATH"]
+    registry_path = current_app.config.get("REGISTRY_PATH") or os.path.join(
+        current_app.root_path, "..", "registry.json"
+    )
     registry = load_registry(registry_path)
-    
-    data = request.get_json(silent=True) or {}
-    if not data or "url" not in data:
-        return jsonify({"error": "No url provided"}), 400
-    
-    url = (data.get("url") or "").strip()
-    name = (data.get("name") or "").strip()
+
+    body = request.get_json(silent=True) or {}
+    url = (body.get("url") or "").strip()
+    name = (body.get("name") or "").strip()
+    version = (body.get("version") or "0.0.1").strip()
 
     if not url or not name:
         return jsonify({"error": "Missing field(s): url and name are required"}), 400
-    
+
+    # Detect artifact type from URL
     try:
         artifact_type = infer_artifact_type(url)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    
-    # TODO: compute real rating; placeholder kept to match spec flow
-    rating = 0
-    if rating < 0.5:
-        return jsonify({"error": "Rating too low. Not uploading."}), 424
 
-    # Get url type
-    if artifact_type == "unknown":
-        return jsonify({"error": "Could not detect artifact type"}), 400
-    
+    # prevent duplicates by URL
+    existing = None
+    if isinstance(registry, dict):
+        for entry in registry.values():
+            if entry.get("data", {}).get("url") == url:
+                existing = entry
+                break
+    else:  # legacy list shape
+        for entry in registry:
+            if isinstance(entry, dict) and entry.get("data", {}).get("url") == url:
+                existing = entry
+                break
+    if existing:
+        return jsonify({"error": "Artifact with this URL already exists"}), 409
+
     artifact_id = uuid.uuid4().hex
-    artifact_entry = {
-        "metadata": {"name": name, "id": artifact_id, "type": artifact_type},
-        "data": {"url": url}
+    entry = {
+        "metadata": {
+            "id": artifact_id,
+            "name": name,
+            "version": version,
+            "type": artifact_type,  # matches OpenAPI ArtifactType enum
+        },
+        "data": {"url": url},
     }
 
-    registry[artifact_id] = artifact_entry
+    # Save
+    if isinstance(registry, dict):
+        registry[artifact_id] = entry
+    else:
+        registry.append(entry)  # fallback if utils wasn't upgraded yet
+
     save_registry(registry_path, registry)
-    return jsonify(artifact_entry), 201
-    # try:
-    #     response = requests.post(
-    #         f"http://localhost:5000/artifact/{artifact_type}",
-    #         json={"url": url},
-    #     )
-    #     return jsonify(response.json()), response.status_code
-    # except Exception as e:
-    #     return jsonify({"Failed to forward to artifact endpoint": str(e)}), 500
+    return jsonify(entry), 201
 
 
 @upload_bp.route("/artifact/<artifact_type>", methods=["POST"])
