@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Upload from "./Upload";
 import Rate from "./Rate";
 import Download from "./Download";
-import Button from "react-bootstrap/Button";
+import SearchByNameType from "./SearchByNameType";
 
 interface MetaData {
     id: string;
@@ -56,13 +56,9 @@ const Artifacts: React.FC = () => {
             
             <div className="flex flex-row items-center justify-center gap-3 mb-4">
                 <Upload />
-
-                <Button
-                    onClick={fetchArtifacts}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded"
-                >
-                    {loading ? "Loading..." : "Reload"}
-                </Button>
+                <SearchByNameType 
+                    result={(data) => setArtifacts(data)}
+                />
             </div>
 
             {loading ? (
