@@ -2,41 +2,63 @@ from flask import Blueprint, request, jsonify, current_app
 import os
 import uuid
 import requests
-from utils.registry_utils import load_registry, save_registry
+from utils.registry_utils import load_registry, save_registry, infer_artifact_type
 
 upload_bp = Blueprint("upload", __name__)
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 
 
-def func(url: str) -> str:
-    return "model"
-
-
 @upload_bp.route("/upload", methods=["POST"])
-def upload_model():
+def upload_artifact():
     '''
     Receive a model via url link from frontend and
     detect the type from phase 1 code
     '''
-    data = request.get_json()
+    registry_path = current_app.config["REGISTRY_PATH"]
+    registry = load_registry(registry_path)
+    
+    data = request.get_json(silent=True) or {}
     if not data or "url" not in data:
         return jsonify({"error": "No url provided"}), 400
+    
+    url = (data.get("url") or "").strip()
+    name = (data.get("name") or "").strip()
+
+    if not url or not name:
+        return jsonify({"error": "Missing field(s): url and name are required"}), 400
+    
+    try:
+        artifact_type = infer_artifact_type(url)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    
+    # TODO: compute real rating; placeholder kept to match spec flow
+    rating = 0
+    if rating < 0.5:
+        return jsonify({"error": "Rating too low. Not uploading."}), 424
 
     # Get url type
-    url = data["url"]
-    artifact_type = func(url) # !!!!NEED TO ACTUALLY USE A REAL FUNCTION!!!!
     if artifact_type == "unknown":
         return jsonify({"error": "Could not detect artifact type"}), 400
+    
+    artifact_id = uuid.uuid4().hex
+    artifact_entry = {
+        "metadata": {"name": name, "id": artifact_id, "type": artifact_type},
+        "data": {"url": url}
+    }
 
-    try:
-        response = requests.post(
-            f"http://localhost:5000/artifact/{artifact_type}",
-            json={"url": url},
-        )
-        return jsonify(response.json()), response.status_code
-    except Exception as e:
-        return jsonify({"Failed to forward to artifact endpoint": str(e)}), 500
+    registry[artifact_id] = artifact_entry
+    save_registry(registry_path, registry)
+    return jsonify(artifact_entry), 201
+    # try:
+    #     response = requests.post(
+    #         f"http://localhost:5000/artifact/{artifact_type}",
+    #         json={"url": url},
+    #     )
+    #     return jsonify(response.json()), response.status_code
+    # except Exception as e:
+    #     return jsonify({"Failed to forward to artifact endpoint": str(e)}), 500
 
 
 @upload_bp.route("/artifact/<artifact_type>", methods=["POST"])
