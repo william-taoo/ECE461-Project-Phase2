@@ -46,7 +46,7 @@ class Model:
         self.url = model_url
         self.dataset_url = dataset_url
         self.code_url = code_url
-        self.name = ''
+        self.name = self.get_name()
         self.category = ''
         self.size_score = {}
         self.license_score = 0.0
@@ -56,6 +56,9 @@ class Model:
         self.code = Code(code_url) #Contains code quality and availability scores
         self.performance_claims = 0.0
         self.dataset_and_code_score = 0.0
+        self.reproducibility = 0.0
+        self.reviewedness = 0.0
+        self.treescore = 0.0
         self.net_score = 0.0
 
         self.size_score_latency = 0
@@ -66,6 +69,9 @@ class Model:
         self.dataset_and_code_score_latency = 0
         self.dataset_quality_latency = 0
         self.code_quality_latency = 0
+        self.reproducibility_latency = 0
+        self.reviewedness_latency = 0
+        self.treescore_latency = 0
         self.net_score_latency = 0
 
 
@@ -584,7 +590,7 @@ class Model:
                             rev_ok = True
                             break
                 # add up additions for code files
-                pr_files_addition = 0
+                pr_files_additions = 0
                 for page in get_paginated(f"{base_url}/pulls/{pr_number}/files", {}):
                     for f in page:
                         fname = f.get("filename") or ""
@@ -605,7 +611,7 @@ class Model:
         return max(0.0, min(1.0, reviewedness))
 
     def get_treescore(self) -> float:
-        pass
+        return 0.0
 
     def get_lineage_graph(self) -> Optional[nx.DiGraph]:
         self.lineage_graph = None
@@ -686,6 +692,9 @@ class Model:
             future_dataset_quality = executor.submit(self.time_metric, self.dataset.get_quality, api_key=api_key)
             future_code_quality = executor.submit(self.time_metric, self.code.get_quality)
             future_dataset_and_code_score = executor.submit(self.time_metric, self.get_dataset_and_code_score)
+            future_reproducibility = executor.submit(self.time_metric, self.get_reproducibility)
+            future_reviewedness = executor.submit(self.time_metric, self.get_reviewedness)
+            future_treescore = executor.submit(self.time_metric, self.get_treescore)
 
             self.size_score, self.size_score_latency = future_size.result()
             self.license_score, self.license_latency = future_license.result()
@@ -695,27 +704,54 @@ class Model:
             self.dataset.quality, self.dataset_quality_latency = future_dataset_quality.result()
             self.code.quality, self.code_quality_latency = future_code_quality.result()
             self.dataset_and_code_score, self.dataset_and_code_score_latency = future_dataset_and_code_score.result()
+            self.reproducibility, self.reproducibility_latency = future_reproducibility.result()
+            self.reviewedness, self.reviewedness_latency = future_reviewedness.result()
+            self.treescore, self.treescore_latency = future_treescore.result()
 
         # Example weights, can be adjusted based on importance
         weights: Dict[str, float] = {
-            'license': 0.25,
-            'ramp_up_time': 0.30,
-            'bus_factor': 0.10,
-            'dataset_quality': 0.095,
-            'code_quality': 0.005,
-            'performance_claims': 0.20,
-            'dataset_and_code_score': 0.05
+            "license": 0.25,
+            "ramp_up_time": 0.30,
+            "bus_factor": 0.10,
+            "dataset_quality": 0.095,
+            "code_quality": 0.005,
+            "performance_claims": 0.20,
+            "dataset_and_code_score": 0.05,
+            "reproducibility": 0.08,
+            "reviewedness": 0.04,
+            "treescore": 0.02,
         }
 
-        self.net_score = (
-            weights['license'] * self.license_score +
-            weights['ramp_up_time'] * self.ramp_up_time +
-            weights['bus_factor'] * self.bus_factor +
-            weights['dataset_quality'] * self.dataset.quality +
-            weights['code_quality'] * self.code.quality +
-            weights['performance_claims'] * self.performance_claims +
-            weights['dataset_and_code_score'] * self.dataset_and_code_score
-        )
+        components: Dict[str, Any] = {
+            "license": self.license_score,
+            "ramp_up_time": self.ramp_up_time,
+            "bus_factor": self.bus_factor,
+            "dataset_quality": getattr(self.dataset, "quality", 0.0),
+            "code_quality": getattr(self.code, "quality", 0.0),
+            "performance_claims": self.performance_claims,
+            "dataset_and_code_score": self.dataset_and_code_score,
+            "reproducibility": self.reproducibility,
+            "reviewedness": None if (self.reviewedness is None or float(self.reviewedness) < 0.0) else self.reviewedness,
+            "treescore": self.treescore if self.treescore is not None else None,
+        }
+
+        effective_weights: Dict[str, float] = {}
+        for k, w in weights.items():
+            v = components.get(k)
+            if v is None:
+                continue
+            if self._is_valid_score(v):
+                effective_weights[k] = float(w)
+
+        weight_sum = sum(effective_weights.values())
+        if weight_sum <= 0.0:
+            self.net_score = 0.0
+        else:
+            total = 0.0
+            for k, w in effective_weights.items():
+                v = self._clip01(components[k])
+                total += v * (w / weight_sum)
+            self.net_score = float(round(total, 4))
 
         self.net_score_latency = (
             self.size_score_latency +
@@ -725,7 +761,11 @@ class Model:
             self.performance_claims_latency +
             self.dataset_quality_latency +
             self.code_quality_latency +
-            self.dataset_and_code_score_latency
+            self.dataset_and_code_score_latency +
+            self.reproducibility_latency +
+            self.reviewedness_latency +
+            self.treescore_latency
         )
+
 
         return self.net_score
