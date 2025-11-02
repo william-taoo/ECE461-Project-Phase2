@@ -64,7 +64,7 @@ def health_check_components():
         for comp in components:
             comp["timeline"] = [
                 {
-                    "bucket": (datetime.now(timezone.utc) - timedelta(minutes=i * (window_minutes / 5))).isoformat() + "Z",
+                    "bucket": datetime.now(timezone.utc) + "Z",
                     "value": 0,
                     "unit": "events"
                 }
