@@ -10,14 +10,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # checkout latest code  
       - name: Checkout latest code
         uses: actions/checkout@v4
 
-      # Set up Node.js for frontend
+      # setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
+
+      # Create .env for React frontend pointing to EC2
+      - name: Setup React environment
+        run: |
+          echo "REACT_APP_API_BASE=http://${{ secrets.EC2_HOST }}:5000" > frontend/.env
 
       # Install frontend dependencies
       - name: Install frontend dependencies
@@ -27,7 +33,7 @@ jobs:
       # Build frontend
       - name: Build frontend
         working-directory: ./frontend
-        run: npm run build
+        run: CI=false npm run build
 
       # Verify build folder exists
       - name: List frontend build

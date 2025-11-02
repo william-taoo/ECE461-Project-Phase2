@@ -78,6 +78,14 @@ def load_registry(path: str):
         except json.JSONDecodeError:
             return {}
 
+def iter_registry(registry):
+    if isinstance(registry, dict):
+        for aid, item in registry.items():
+            yield str(aid), item
+    elif isinstance(registry, list):
+        for item in registry:
+            aid = str(item.get("metadata", {}).get("id") or item.get("id") or "")
+            yield aid, item
 
 def save_registry(path: str, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
