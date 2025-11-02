@@ -11,15 +11,9 @@ def get_artifacts():
     This will send a request for models in the registry 
     given a name and type
     '''
-
     # Access to config for registry path
     registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
-
-    # Header
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
     
     # Request
     try:
@@ -61,11 +55,6 @@ def get_name(name: str):
     Return the metadata of the artifacts that match the
     provided name
     '''
-    # Check authorization
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
-    
     # Check if name is valid
     if not name or name.strip() == "":
         return jsonify({"error": "Missing or invalid artifact name"}), 400
@@ -90,11 +79,6 @@ def get_artifact(artifact_type: str, id: str):
     '''
     Retrieve artifact metadata by type and id
     '''
-    # Check authorization
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
-    
     registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
     artifact = registry.get(id)
@@ -113,11 +97,6 @@ def get_cost(artifact_type: str, id: str):
     '''
     dependency = request.args.get("dependency", "false").lower() == "true"
 
-    # Check authorization
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
-    
     if not artifact_type or not id:
         return jsonify({"error": "Missing field(s)"}), 400
     
@@ -150,10 +129,6 @@ def get_audit(artifact_type: str, id: str):
     '''
     Get the audit log for an artifact
     '''
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
-    
     if not artifact_type or not id:
         return jsonify({"error": "Missing field(s)"}), 400
     
@@ -174,10 +149,6 @@ def get_lineage(id: str):
     '''
     Get the lineage graph of an artifact
     '''
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
-    
     if not id:
         return jsonify({"error": "Missing field"}), 400
     
@@ -197,10 +168,6 @@ def check_license(id: str):
     '''
     Check if the license is compatible
     '''
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
-    
     data = request.get_json()
     if not data or "github_url" not in data:
         return jsonify({"error": "Missing github_url"}), 400
@@ -224,10 +191,6 @@ def get_by_regex():
     '''
     Retrieve artifacts matching name regex
     '''
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
-    
     regex = request.get_json()
     if not regex or "regex" not in regex:
         return jsonify({"error": "Missing regex"}), 400

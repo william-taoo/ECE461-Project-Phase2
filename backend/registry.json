@@ -1,0 +1,13 @@
+{
+    "88a346137ddf482290d16a57dc9a8f26": {
+        "metadata": {
+            "id": "88a346137ddf482290d16a57dc9a8f26",
+            "name": "bert-base-uncased",
+            "version": "0.0.1",
+            "type": "model"
+        },
+        "data": {
+            "url": "https://huggingface.co/google-bert/bert-base-uncased"
+        }
+    }
+}

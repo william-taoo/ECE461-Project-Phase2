@@ -16,9 +16,20 @@ const Artifacts: React.FC = () => {
     const fetchArtifacts = async () =>{
         try {
             setLoading(true);
-            const res = await fetch("http://localhost:5000/artifacts");
+            const res = await fetch("http://localhost:5000/artifacts", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify([
+                    {
+                        name: "*", // Wildcard to get all artifacts
+                        type: null // or "model" / "dataset" if you want to filter
+                    }
+                ])
+            });
             const data = await res.json();
-            setArtifacts(data.artifacts || []);
+            setArtifacts(data || []);
         } catch (error) {
             console.error("Error fetching artifacts:", error);
         } finally {

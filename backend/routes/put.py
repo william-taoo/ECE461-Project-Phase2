@@ -11,11 +11,6 @@ def update_artifact(artifact_type: str, id: str):
     # Access to config for registry path
     registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
-
-    # Header
-    auth_header = request.headers.get("X-Authorization")
-    if not auth_header:
-        return jsonify({"error": "Missing authentication header"}), 403
     
     data = request.get_json()
     if not data:
