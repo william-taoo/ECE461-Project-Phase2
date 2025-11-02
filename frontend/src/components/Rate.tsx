@@ -1,10 +1,26 @@
 import React from "react";
 import Button from "react-bootstrap/Button";
 
-const Rate: React.FC = () => {
-    const handleRate = () => {
-        console.log("Rate button clicked");
-        // Link Flask API
+interface RateProps {
+    artifactID: string;
+    result: (data: any) => void;
+}
+
+const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
+
+const Rate: React.FC<RateProps> = ({ artifactID, result }) => {
+    const handleRate = async () => {
+        try {
+            const endpoint = `${API_BASE}/artifact/model/${artifactID}/rate`;
+            const res = await fetch(endpoint, {
+                method: "GET",
+                headers: { "Content-Type": "application/json" },
+            });
+            const data = await res.json();
+            result(data);
+        } catch (error) {
+            console.error("Error rating model:", error);
+        }
     };
 
     return (

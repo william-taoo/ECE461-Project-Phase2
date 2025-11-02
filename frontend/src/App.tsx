@@ -1,7 +1,4 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Upload from './components/Upload';
-import Rate from './components/Rate';
-import Download from './components/Download';
 import Health from './components/Health';
 import Artifacts from './components/Artifacts';
 
@@ -16,14 +13,6 @@ function App() {
                 <Health />
                 <Artifacts />
             </div>
-
-            <div className="flex gap-12">
-                <Upload />
-                <Rate />
-                <Download />
-            </div>
-
-            
         </div>
     );
 }
