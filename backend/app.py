@@ -6,6 +6,7 @@ from routes.rate import rate_bp
 from routes.download import download_bp
 from routes.retrieve import retrieve_bp
 from routes.remove import remove_bp
+from routes.health import health_bp
 
 REGISTRY_PATH = os.path.join(os.path.dirname(__file__), "registry.json")
 
@@ -23,7 +24,7 @@ app.register_blueprint(rate_bp)
 app.register_blueprint(download_bp)
 app.register_blueprint(retrieve_bp)
 app.register_blueprint(remove_bp)
-
+app.register_blueprint(health_bp)
 
 @app.route('/')
 def home():

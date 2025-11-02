@@ -32,7 +32,7 @@ def health_check_components():
     registry_ok = True # Change when checks are implemented
 
     # Might need to change depending on what health diagnosis we have
-    components = {
+    components = [{
         "id": "registry",
         "display_name": "Model Registry File",
         "status": "ok" if registry_ok else "error",
@@ -58,13 +58,13 @@ def health_check_components():
                 "last_updated_at": now
             }
         ]
-    }
+    }]
 
     if include_timeline:
         for comp in components:
             comp["timeline"] = [
                 {
-                    "bucket": datetime.now(timezone.utc) + "Z",
+                    "bucket": datetime.now(timezone.utc).isoformat() + "Z",
                     "value": 0,
                     "unit": "events"
                 }

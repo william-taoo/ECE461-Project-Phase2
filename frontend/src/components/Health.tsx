@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 interface HealthComponent {
     id: string;
     display_name: string;
-    status: "OK" | "BAD";
+    status: "OK" | "ERROR" | "UNKNOWN";
     observed_at: string;
     description: string;
     metrics: Record<string, number>;
@@ -11,8 +11,8 @@ interface HealthComponent {
 
 const Health: React.FC = () => {
     const [components, setComponents] = useState<HealthComponent[]>([]);
-    const [color, setColor] = useState<string>("bg-gray-500 text-white");
-    const [loading, setLoading] = useState<boolean>(false);
+    const [overallStatus, setOverallStatus] = useState<string>("UNKNOWN");
+    const [loading, setLoading] = useState<boolean>(true);
 
     // Get health status
     useEffect(() => {
@@ -20,16 +20,10 @@ const Health: React.FC = () => {
             try {
                 const statusRes = await fetch("http://localhost:5000/health");
                 const healthStatus = await statusRes.json();
-
-                if (healthStatus.status === "OK") {
-                    setColor("bg-green-500 text-white");
-                } else {
-                    setColor("bg-red-500 text-white");
-                }
+                setOverallStatus(healthStatus.status || "UNKNOWN");
             } catch (error) {
                 console.error("Error fetching health status:", error);
-            } finally {
-                setLoading(false);
+                setOverallStatus("ERROR");
             }
         };
 
@@ -42,7 +36,7 @@ const Health: React.FC = () => {
             try {
                 const componentRes = await fetch("http://localhost:5000/health/components");
                 const healthComponents = await componentRes.json();
-                setComponents(healthComponents || []);
+                setComponents(healthComponents.components || []);
             } catch (error) {
                 console.error("Error fetching health components:", error);
             } finally {
@@ -53,11 +47,36 @@ const Health: React.FC = () => {
         fetchHealthComponents();
     }, []);
 
+    const getColor = (status: string) => {
+        switch (status.toLowerCase()) {
+            case "OK":
+                return "bg-green-500 text-white";
+            case "ERROR":
+                return "bg-red-500 text-white";
+            case "UNKNOWN":
+                return "bg-gray-500 text-white";
+            default:
+                return "bg-gray-500 text-white";
+        }
+    };
+
     if (loading) return <p className="text-gray-400">Loading health data...</p>;
 
     return (
-        <div className="p-4 bg-gray-500 text-white rounded-2xl shadow-lg w-full">
+        <div className="p-4 bg-gray-500 text-white rounded-2xl shadow-lg w-half">
             <h2 className="text-xl font-bold mb-4">System Health</h2>
+
+            {/* Overall Health */}
+            <div className="mb-6 flex items-center">
+                <span className="font-semibold mr-3">Overall Status:</span>
+                <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${getColor(overallStatus)}`}
+                >
+                {overallStatus.toUpperCase()}
+                </span>
+            </div>
+
+            {/* Components */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {components.map((comp) => (
                 <div
@@ -67,15 +86,18 @@ const Health: React.FC = () => {
                     <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">{comp.display_name}</h3>
                         <span
-                            className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${getColor(
+                                comp.status
+                            )}`}
                         >
                             {comp.status.toUpperCase()}
                         </span>
                     </div>
                     <p className="text-sm text-gray-400 mb-2">{comp.description}</p>
                     <p className="text-xs text-gray-500">
-                    Last checked: {new Date(comp.observed_at).toLocaleString()}
+                        Last checked: {new Date(comp.observed_at).toLocaleString()}
                     </p>
+
                     <div className="mt-3 text-sm text-gray-300">
                         {Object.entries(comp.metrics).map(([key, value]) => (
                             <div key={key} className="flex justify-between">
@@ -88,7 +110,7 @@ const Health: React.FC = () => {
                 ))}
             </div>
         </div>
-    )
+    );
 };
 
 export default Health;
