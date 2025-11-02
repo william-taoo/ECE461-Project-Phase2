@@ -611,57 +611,150 @@ class Model:
         return max(0.0, min(1.0, reviewedness))
 
     def get_treescore(self) -> float:
-        return 0.0
+        try:
+            g = self.get_lineage_graph()
+            if g is None:
+                return 0.0
+
+            # Parents are direct predecessors of this node
+            parts = urlparse(self.url).path.strip("/").split("/")
+            if len(parts) < 2:
+                return 0.0
+            this_node = f"{parts[0]}/{parts[1]}"
+
+            if this_node not in g:
+                return 0.0
+
+            parents = list(g.predecessors(this_node))
+            if not parents:
+                return 0.0
+
+            parents = parents[:5]
+
+            api_key = os.getenv("API_KEY", "")
+
+            scores: list[float] = []
+            for parent_repo in parents:
+                # Only score real HF repos, skip architecture tags
+                if not self._looks_like_hf_repo(parent_repo):
+                    continue
+
+                parent_url = self._to_hf_url(parent_repo)
+
+                try:
+                    # Compute child's net score but disable its own TreeScore to avoid recursion
+                    parent_model = Model(parent_url, dataset_url="", code_url="")
+                    parent_model.get_treescore = lambda: 0.0  # type: ignore[attr-defined]
+                    s = float(parent_model.compute_net_score(api_key=api_key))
+                    if 0.0 <= s <= 1.0:
+                        scores.append(s)
+                except Exception:
+                    continue
+
+            if not scores:
+                return 0.0
+
+            return self._clip01(sum(scores) / len(scores))
+        except Exception:
+            return 0.0
+    
+    # Treescore helper functions
+    def _clip01(self, x: float) -> float:
+        try:
+            return max(0.0, min(1.0, float(x)))
+        except Exception:
+            return 0.0
+        
+    def _looks_like_hf_repo(self, s: str) -> bool:
+        s = (s or "").strip()
+        if not s:
+            return False
+        if "/" in s:
+            left, right = s.split("/", 1)
+            return bool(left) and bool(right) and all(ch not in right for ch in ("\\", " ", "\t"))
+        return "-" in s and " " not in s and "\\" not in s and "/" not in s
+
+    def _to_hf_url(self, repo_id: str) -> str:
+        return f"https://huggingface.co/{repo_id.strip()}"
+
+    def _extract_parent_repo_ids_from_config(self, cfg: dict) -> list[str]:
+        """
+        Pull likely upstream model ids from HF-style config.json.
+        This is heuristic but covers the most common fields used by adapters/merges/finetunes.
+        """
+        candidates: set[str] = set()
+
+        for k in [
+            "base_model_name_or_path",
+            "base_model",
+            "init_model_name_or_path",
+            "peft_base_model_id",
+            "merge_base_model",
+            "source_model", "teacher_model_name_or_path",
+            "vision_model_name_or_path", "text_model_name_or_path",
+            "llm_model_name_or_path", "model_id",
+            "adapter_model_name_or_path",
+            "tokenizer_name_or_path",
+        ]:
+            v = cfg.get(k)
+            if isinstance(v, str) and self._looks_like_hf_repo(v):
+                candidates.add(v)
+
+        for k in [
+            "merge_base_models", "parent_models", "source_models",
+            "model_fusion_sources", "models_to_merge",
+        ]:
+            v = cfg.get(k)
+            if isinstance(v, (list, tuple)):
+                for item in v:
+                    if isinstance(item, str) and self._looks_like_hf_repo(item):
+                        candidates.add(item)
+
+        peft_cfg = cfg.get("peft_config") or cfg.get("peft")
+        if isinstance(peft_cfg, dict):
+            for k in ["base_model_name_or_path", "target_model", "model_id"]:
+                v = peft_cfg.get(k)
+                if isinstance(v, str) and self._looks_like_hf_repo(v):
+                    candidates.add(v)
+
+        # 4) Fallthrough: architectures/model_type are *architectures*, not parents; skip
+        return list(candidates)
 
     def get_lineage_graph(self) -> Optional[nx.DiGraph]:
         self.lineage_graph = None
         api = HfApi()
 
-        # parse the URL to get the repository ID
-        path_parts = urlparse(self.url).path.strip('/').split('/')
-        if len(path_parts) < 2:
+        parts = urlparse(self.url).path.strip("/").split("/")
+        if len(parts) < 2:
             return None
-        repo_id = f"{path_parts[0]}/{path_parts[1]}"
+        repo_id = f"{parts[0]}/{parts[1]}"
 
         try:
-            # extract model config.json
-            config_path = api.hf_hub_download(repo_id=repo_id, filename="config.json")
-            with open(config_path, "r") as f:
-                config_data = json.load(f)
+            cfg_path = api.hf_hub_download(repo_id=repo_id, filename="config.json")
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            return None
 
-            # infer the base architecture
-            model_type = config_data.get("model_type", None)
-            architectures = config_data.get("architectures", [])
+        g: nx.DiGraph = nx.DiGraph()
+        this_node = repo_id  # use canonical "org/name" when possible
+        g.add_node(this_node)
 
-            # create a directed graph
-            graph: nx.DiGraph = nx.DiGraph()
+        # Parents we can actually score
+        parent_ids = self._extract_parent_repo_ids_from_config(cfg)
+        for p in parent_ids:
+            g.add_node(p)
+            g.add_edge(p, this_node)
 
-            # add this model
-            graph.add_node(self.name)
+        # (Optional) include architecture hint as a weak parent when no explicit bases exist
+        if not parent_ids:
+            model_type = cfg.get("model_type")
+            if isinstance(model_type, str) and model_type.strip():
+                arch_node = f"ARCH::{model_type.strip().lower()}"
+                g.add_node(arch_node)
+                g.add_edge(arch_node, this_node)
 
-            # infer possible model lineage
-            if model_type is not None:
-                base_model_name = model_type.upper()
-                graph.add_node(base_model_name)
-                graph.add_edge(base_model_name, self.name)
-
-            # optionally add architectures if models aren't present
-            for arch in architectures:
-                graph.add_node(arch)
-                graph.add_edge(arch, self.name)
-
-            # plot the graph (ONLY FOR TESTING)
-            pos = nx.spring_layout(graph)
-            nx.draw(graph, pos, with_labels=True, node_size=3000,
-                    node_color="lightblue", font_size=10, arrowsize=20)
-            plt.title(f"Lineage Graph for {self.name}")
-            plt.show()
-
-            self.lineage_graph = graph
-    
-        except Exception as e:
-            self.lineage_graph = None
-
+        self.lineage_graph = g
         return self.lineage_graph
 
     def get_dataset_and_code_score(self) -> float:
