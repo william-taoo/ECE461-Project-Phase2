@@ -11,24 +11,38 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
     const [show, setShow] = useState(false);
     const [searchName, setSearchName] = useState<string>("");
     const [searchType, setSearchType] = useState<string>("all");
+    const [searchVersion, setSearchVersion] = useState<string>("");
 
     const handleClose = () => setShow(false);
     const handleShow = () => setShow(true);
 
     const handleSearch = async () => {
         try {
+            const query: any = {
+                    name: (searchName || "*").trim(),
+            };
+            if (searchVersion.trim()) {
+                    query.version = searchVersion.trim();
+            }
+            if (searchType !== "all") {
+                    query.type = searchType;
+            }
+
             const endpoint = `${API_BASE}/artifacts`;
             const res = await fetch(endpoint, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify([
-                    {
-                        name: searchName || "*",
-                        types: searchType
-                    }
-                ])
-            })
-            const data = await res.json();
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify([query]),
+            });
+            const text = await res.text();
+            if (!res.ok) {
+                let msg = "Search failed.";
+                try { msg = JSON.parse(text)?.error ?? msg; } catch {}
+                throw new Error(`${msg} (${res.status})`);
+            }
+            const data = JSON.parse(text);
             result(data);
         } catch (error) {
             console.error("Error searching artifacts:", error);
@@ -57,14 +71,14 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
                 </Modal.Header>
 
                 <Modal.Body>
-                    <Form>
+                    <Form onSubmit={(e) => { e.preventDefault(); handleSearch(); }}>
                         <Form.Group className="mb-3">
                             <Form.Label>Name</Form.Label>
                             <Form.Control
                                 type="text"
                                 value={searchName}
                                 onChange={(e) => setSearchName(e.target.value)}
-                                placeholder="Ex: bert-base-uncased"
+                                placeholder='Ex: bert-base-uncased (or "*" for all)'
                             />
                         </Form.Group>
                         <Form.Group className="mb-3">
@@ -79,6 +93,24 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
                                 <option value="code">Code</option>
                             </Form.Select>
                         </Form.Group>
+                        <Form.Group className="mb-1">
+                            <Form.Label>Version (SemverRange)</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={searchVersion}
+                                onChange={(e) => setSearchVersion(e.target.value)}
+                                placeholder={`Examples: 
+0.3.0 (exact) 
+1.* (wildcard) 
+>=1.2.0 (comparator) 
+^1.2.3 (caret) 
+~1.4.0 (tilde)
+`}
+                            />
+                            <Form.Text>
+                                Leave blank to ignore version. Use only one style (exact, wildcard, comparator, caret, or tilde).
+                            </Form.Text>
+                            </Form.Group>
                     </Form>
                 </Modal.Body>
 
