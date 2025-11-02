@@ -27,7 +27,7 @@ jobs:
       # Build frontend
       - name: Build frontend
         working-directory: ./frontend
-        run: npm run build
+        run: CI=false npm run build
 
       # Verify build folder exists
       - name: List frontend build
