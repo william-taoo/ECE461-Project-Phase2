@@ -59,7 +59,8 @@ jobs:
             script: |
                 cd /home/ec2-user/projects/myapp/backend
                 source /home/ec2-user/projects/myapp/venv/bin/activate
-                # Kill existing gunicorn processes
+                # Kill old gunicorn if running
                 pkill -f "gunicorn.*app:app" || true
-                # Start gunicorn in the background
+                # Start Gunicorn detached so SSH session can exit
                 nohup gunicorn -w 4 -b 0.0.0.0:5000 app:app > gunicorn.log 2>&1 &
+                echo "Gunicorn started successfully"
