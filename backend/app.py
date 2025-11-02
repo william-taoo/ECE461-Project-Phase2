@@ -18,7 +18,7 @@ REGISTRY_PATH = os.path.join(BASE_DIR, "registry.json")
 app = Flask(
     __name__,
     static_folder=FRONTEND_BUILD_DIR,  # serve built React files
-    static_url_path="/"
+    static_url_path=""
 )
 CORS(app)
 
