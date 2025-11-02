@@ -6,31 +6,42 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout latest code
         uses: actions/checkout@v4
 
-      - name: Copy files to EC2
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Copy backend and frontend build to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "."
-          target: "/home/ec2-user/projects/myapp"
+          source: |
+            ./backend
+            ./frontend/build
+          target: /home/ec2-user/myapp
 
-      - name: Run deployment commands on EC2
+      - name: Restart backend service on EC2
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ec2-user/projects/myapp/ECE461-Project-Phase2/backend
-            source /home/ec2-user/projects/myapp/venv/bin/activate
-            git pull origin main || true
-            pip install -r /home/ec2-user/projects/myapp/ECE461-Project-Phase2/requirements.txt
             sudo systemctl restart myapp
