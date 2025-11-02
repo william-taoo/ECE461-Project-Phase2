@@ -3,6 +3,7 @@ import Upload from "./Upload";
 import Rate from "./Rate";
 import Download from "./Download";
 import SearchByNameType from "./SearchByNameType";
+import ModelByName from "./ModelByName";
 
 interface MetaData {
     id: string;
@@ -24,6 +25,7 @@ const Artifacts: React.FC = () => {
     const [artifacts, setArtifacts] = useState<Artifact[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [selectedResult, setSelectedResult] = useState<any | null>(null);
+    const [searchResults, setSearchResults] = useState<MetaData[]>([]);
 
     // Fetch artifacts from backend
     const fetchArtifacts = async () =>{
@@ -59,8 +61,39 @@ const Artifacts: React.FC = () => {
                 <SearchByNameType 
                     result={(data) => setArtifacts(data)}
                 />
+                <ModelByName onResults={(items) => setSearchResults(items)} />
             </div>
 
+            {searchResults.length > 0 && (
+                <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2">Search Results (by name)</h3>
+                <div className="max-h-[20rem] overflow-y-auto pr-2">
+                    <ul className="space-y-3">
+                    {searchResults.map((m) => (
+                        <li
+                        key={m.id}
+                        className="p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-gray-600 transition"
+                        >
+                        <div className="flex items-center justify-between">
+                            <span className="font-semibold">{m.name}</span>
+                            <span className="text-sm text-gray-400">v{m.version}</span>
+                        </div>
+                        <div className="text-sm text-gray-400">ID: {m.id}</div>
+                        <div className="text-sm text-gray-400">Type: {m.type}</div>
+
+                        <div className="mt-3 flex flex-row gap-3">
+                            <Rate artifactID={m.id} result={(data) => setSelectedResult(data)} />
+                            {/* No Download button here because the name-only endpoint
+                                doesn't return a URL. If you want Download, fetch by ID
+                                to get the full Artifact (with data.url) first. */}
+                        </div>
+                        </li>
+                    ))}
+                    </ul>
+                </div>
+                </div>
+            )}
+            
             {loading ? (
                 <p className="text-gray-400 text-sm">Fetching artifacts...</p>
             ) : artifacts.length > 0 ? (
