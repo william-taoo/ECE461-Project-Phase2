@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from utils.registry_utils import load_registry, save_registry
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import os
 
 
@@ -8,6 +7,7 @@ health_bp = Blueprint("health", __name__)
 
 @health_bp.route("/health", methods=["GET"])
 def health_check():
+    print("Health check requested")
     return jsonify({"status": "OK"}), 200
 
 @health_bp.route("/health/components", methods=["GET"])

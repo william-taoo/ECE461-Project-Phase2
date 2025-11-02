@@ -2,6 +2,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import Upload from './components/Upload';
 import Rate from './components/Rate';
 import Download from './components/Download';
+import Health from './components/Health';
 
 function App() {
 
@@ -14,6 +15,8 @@ function App() {
                 <Rate />
                 <Download />
             </div>
+
+            <Health />
         </div>
     );
 }
