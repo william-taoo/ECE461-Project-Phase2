@@ -82,6 +82,9 @@ const Artifacts: React.FC = () => {
                                     </span>
                                 </div>
                                 <div className="text-sm text-gray-400">
+                                    ID: {a.metadata.id}
+                                </div>
+                                <div className="text-sm text-gray-400">
                                     Type: {a.metadata.type}
                                 </div>
                                 <div className="text-sm text-gray-400 break-all">
