@@ -17,6 +17,7 @@ CORS(app)
 # confiure registry path
 app.config["REGISTRY_PATH"] = REGISTRY_PATH
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config["API_KEY"] = os.getenv("API_KEY")
 
 # Register blueprints
 app.register_blueprint(register_bp)
