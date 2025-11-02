@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { Button, Modal, Form } from "react-bootstrap";
+import { inferArtifactType } from "../utils/artifactType";
+
+const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
 
 const Upload: React.FC = () => {
     const [show, setShow] = useState(false);
@@ -15,27 +18,35 @@ const Upload: React.FC = () => {
         }
 
         // Link Flask Upload API
+        let type: "model" | "dataset" | "code";
         try {
-            const response = await fetch("http://localhost:5000/upload", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ url: modelURL }),
+            type = inferArtifactType(modelURL);
+        } catch (e: any) {
+            alert(e?.message || "Could not infer artifact type from URL.");
+            return;
+        }
+        
+        try {
+            const endpoint = `${API_BASE}/artifact/${type}`;
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: modelURL }),
             });
-
-            const data = await response.json()
-
+      
+            const data = await response.json().catch(() => ({}));
             if (!response.ok) {
-                alert("Error: " + data.error);
-            } else {
-                alert("Model uploaded successfully!");
-                handleClose(); // Close modal
-                setModelURL("");
+              const msg = data?.error || response.statusText;
+              alert(`Upload failed (${response.status}): ${msg}`);
+              return;
             }
+      
+            alert(`Uploaded as ${type}. ID: ${data?.metadata?.id ?? "(unknown)"}`);
+            handleClose();
+            setModelURL("");
         } catch (err) {
-            console.error("Upload failed: ", err);
-            alert("Error uploading model...");
+            console.error("Upload failed:", err);
+            alert("Network or server error.");
         }
     };
 
@@ -45,7 +56,7 @@ const Upload: React.FC = () => {
                 className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded"
                 onClick={handleShow}
             >
-                Upload Model
+                Upload Model/Dataset/Code
             </Button>
 
             <Modal 
@@ -54,13 +65,13 @@ const Upload: React.FC = () => {
                 centered
             >
                 <Modal.Header className="bg-gray-300" closeButton>
-                    <Modal.Title>Upload Model</Modal.Title>
+                    <Modal.Title>Upload Artifact</Modal.Title>
                 </Modal.Header>
 
                 <Modal.Body>
                     <Form>
                         <Form.Group className="mb-3">
-                            <Form.Label>Model URL</Form.Label>
+                            <Form.Label>Source URL</Form.Label>
                             <Form.Control
                                 type="text"
                                 value={modelURL}
