@@ -7,7 +7,6 @@ health_bp = Blueprint("health", __name__)
 
 @health_bp.route("/health", methods=["GET"])
 def health_check():
-    print("Health check requested")
     return jsonify({"status": "OK"}), 200
 
 @health_bp.route("/health/components", methods=["GET"])
@@ -34,8 +33,8 @@ def health_check_components():
     # Might need to change depending on what health diagnosis we have
     components = [{
         "id": "registry",
-        "display_name": "Model Registry File",
-        "status": "ok" if registry_ok else "error",
+        "display_name": "Model Registry File Example",
+        "status": "OK" if registry_ok else "ERROR",
         "observed_at": now,
         "description": "Tracks all registered artifacts and their metadata.",
         "metrics": {
