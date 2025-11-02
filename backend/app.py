@@ -1,7 +1,7 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 import os
-from routes.upload import upload_bp
+from routes.register import register_bp
 from routes.rate import rate_bp
 from routes.download import download_bp
 from routes.retrieve import retrieve_bp
@@ -19,7 +19,7 @@ app.config["REGISTRY_PATH"] = REGISTRY_PATH
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
 # Register blueprints
-app.register_blueprint(upload_bp)
+app.register_blueprint(register_bp)
 app.register_blueprint(rate_bp)
 app.register_blueprint(download_bp)
 app.register_blueprint(retrieve_bp)

@@ -4,12 +4,12 @@ import uuid
 import requests
 from utils.registry_utils import load_registry, save_registry, infer_artifact_type
 
-artifact_bp = Blueprint("artifact", __name__)
+register_bp = Blueprint("artifact", __name__)
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 
 
-@artifact_bp.route("/artifact/<artifact_type>", methods=["POST"])
+@register_bp.route("/artifact/<artifact_type>", methods=["POST"])
 def register_artifact(artifact_type: str):
     '''
     Register artifact into registry
