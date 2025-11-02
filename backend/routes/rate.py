@@ -30,9 +30,6 @@ def rate_model(id):
     - Treescore: Average of the total model scores of all parents
     of the model
     '''
-    if not request.headers.get("X-Authorization"):
-        return jsonify({"error": "Missing authentication header"}), 403
-
     if ModelClass is None:
         return jsonify({"error": "Model implementation unavailable"}), 500
 
