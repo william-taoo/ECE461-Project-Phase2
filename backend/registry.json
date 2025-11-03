@@ -42,5 +42,16 @@
         "data": {
             "url": "https://huggingface.co/openai/whisper-tiny/tree/main"
         }
+    },
+    "186a1165d008470984c665c27b4a0d73": {
+        "metadata": {
+            "id": "186a1165d008470984c665c27b4a0d73",
+            "name": "embeddinggemma-300m",
+            "version": "0.0.1",
+            "type": "model"
+        },
+        "data": {
+            "url": "https://huggingface.co/google/embeddinggemma-300m"
+        }
     }
 }
