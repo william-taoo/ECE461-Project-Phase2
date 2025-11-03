@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry
 import re
+import fnmatch
 
 
 retrieve_bp = Blueprint("retrieve", __name__)
@@ -17,24 +18,42 @@ def get_artifacts():
     
     # Request
     try:
-        queries = request.get_json()
-        if not isinstance(queries, list):
-            raise ValueError
+        query = request.get_json(force=True, silent=True)
+        print(query)
+        if not query or not isinstance(query, dict):
+            return jsonify({"error": "Invalid request format"}), 400
     except Exception:
-        return jsonify({"error": "Invalid request"})
+        return jsonify({"error": "Invalid request"}), 400
     
     # Query parameters
+    name_query = query.get("name", "*").strip()
+    type_query = query.get("type", "all").strip().lower()
+    version_query = query.get("version", "").strip()
+    
     offset = int(request.args.get("offset", 0))
-    page_size = 1
+    page_size = 10
 
     results = []
-    for query in queries:
-        name = query.get("name")
-        artifact_type = query.get("type")
-        for artifact in registry.values():
-            if (name == "*" or artifact["metadata"]["name"] == name) and \
-                (not artifact_type or artifact["metadata"]["type"] == artifact_type):
-                results.append(artifact)
+    for artifact in registry.values():
+        meta = artifact.get("metadata", {})
+        name = meta.get("name", "")
+        a_type = meta.get("type", "").lower()
+        version = meta.get("version", "")
+
+        if name_query != "*" and name_query.lower() != name.lower():
+            continue
+
+        if type_query != "all" and a_type != type_query:
+            continue
+
+        if version_query:
+            if "*" in version_query:
+                if not fnmatch.fnmatch(version, version_query):
+                    continue
+            elif version_query != version:
+                continue
+
+        results.append(artifact)
 
     # Handle too many artifacts
     if len(results) > 100:

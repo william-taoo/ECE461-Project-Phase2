@@ -9,5 +9,38 @@
         "data": {
             "url": "https://huggingface.co/google-bert/bert-base-uncased"
         }
+    },
+    "4441de1582cc46d69cb57609c139a697": {
+        "metadata": {
+            "id": "4441de1582cc46d69cb57609c139a697",
+            "name": "bookcorpus",
+            "version": "0.0.1",
+            "type": "dataset"
+        },
+        "data": {
+            "url": "https://huggingface.co/datasets/bookcorpus/bookcorpus"
+        }
+    },
+    "db50478f2f464c43af9fbefe15c08ceb": {
+        "metadata": {
+            "id": "db50478f2f464c43af9fbefe15c08ceb",
+            "name": "audience_classifier_model",
+            "version": "0.0.1",
+            "type": "model"
+        },
+        "data": {
+            "url": "https://huggingface.co/parvk11/audience_classifier_model"
+        }
+    },
+    "d4c88ad222ae4a1e93980b8521df9940": {
+        "metadata": {
+            "id": "d4c88ad222ae4a1e93980b8521df9940",
+            "name": "main",
+            "version": "0.0.1",
+            "type": "model"
+        },
+        "data": {
+            "url": "https://huggingface.co/openai/whisper-tiny/tree/main"
+        }
     }
 }

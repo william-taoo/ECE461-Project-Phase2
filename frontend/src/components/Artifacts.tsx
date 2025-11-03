@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Upload from "./Upload";
 import Rate from "./Rate";
 import Download from "./Download";
-import SearchByNameType from "./SearchByNameType";
+import SearchByQuery from "./SearchByQuery";
 import ModelByName from "./ModelByName";
 
 interface MetaData {
@@ -33,7 +33,7 @@ const Artifacts: React.FC = () => {
             
             <div className="flex flex-row items-center justify-center gap-3 mb-4">
                 <Upload />
-                <SearchByNameType result={(data) => setArtifacts(data)} />
+                <SearchByQuery result={(data) => setArtifacts(data)} />
                 <ModelByName onResults={(items) => setSearchResults(items)} />
             </div>
 

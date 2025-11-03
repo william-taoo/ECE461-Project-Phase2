@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { Button, Modal, Form } from "react-bootstrap";
 
-interface SearchByNameTypeProps {
+interface SearchByQueryProps {
     result: (data: any) => void;
 }
 
 const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
 
-const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
+const SearchByQuery: React.FC<SearchByQueryProps> = ({ result }) => {
     const [show, setShow] = useState(false);
     const [searchName, setSearchName] = useState<string>("");
     const [searchType, setSearchType] = useState<string>("all");
@@ -18,15 +18,11 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
 
     const handleSearch = async () => {
         try {
-            const query: any = {
-                    name: (searchName || "*").trim(),
+            const query = {
+                name: (searchName || "*").trim(),
+                type: searchType === "all" ? "all" : searchType,
+                version: searchVersion.trim(),
             };
-            if (searchVersion.trim()) {
-                    query.version = searchVersion.trim();
-            }
-            if (searchType !== "all") {
-                    query.type = searchType;
-            }
 
             const endpoint = `${API_BASE}/artifacts`;
             const res = await fetch(endpoint, {
@@ -34,7 +30,7 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify([query]),
+                body: JSON.stringify(query),
             });
             const text = await res.text();
             if (!res.ok) {
@@ -79,6 +75,7 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
                                 value={searchName}
                                 onChange={(e) => setSearchName(e.target.value)}
                                 placeholder='Ex: bert-base-uncased (or "*" for all)'
+                                required={true}
                             />
                         </Form.Group>
                         <Form.Group className="mb-3">
@@ -99,13 +96,15 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
                                 type="text"
                                 value={searchVersion}
                                 onChange={(e) => setSearchVersion(e.target.value)}
-                                placeholder={`Examples: 
-0.3.0 (exact) 
-1.* (wildcard) 
->=1.2.0 (comparator) 
-^1.2.3 (caret) 
-~1.4.0 (tilde)
-`}
+                                placeholder={
+                                    `Examples: 
+                                    0.3.0 (exact) 
+                                    1.* (wildcard) 
+                                    >=1.2.0 (comparator) 
+                                    ^1.2.3 (caret) 
+                                    ~1.4.0 (tilde)
+                                    `
+                                }
                             />
                             <Form.Text>
                                 Leave blank to ignore version. Use only one style (exact, wildcard, comparator, caret, or tilde).
@@ -119,7 +118,11 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
                         <Button variant="secondary" onClick={handleClose}>
                             Close
                         </Button>
-                        <Button variant="primary" onClick={handleSearch}>
+                        <Button 
+                            variant="primary"
+                            type="submit"
+                            onClick={handleSearch}
+                        >
                             Search
                         </Button>
                     </div>
@@ -129,4 +132,4 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
     );
 };
 
-export default SearchByNameType;
+export default SearchByQuery;
