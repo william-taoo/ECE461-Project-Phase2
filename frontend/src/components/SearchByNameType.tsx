@@ -58,7 +58,7 @@ const SearchByNameType: React.FC<SearchByNameTypeProps> = ({ result }) => {
                 className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded"
                 onClick={handleShow}
             >
-                Search Artifact by Name and/or Type
+                Search by Query
             </Button>
 
             <Modal 

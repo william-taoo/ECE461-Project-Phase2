@@ -27,40 +27,13 @@ const Artifacts: React.FC = () => {
     const [selectedResult, setSelectedResult] = useState<any | null>(null);
     const [searchResults, setSearchResults] = useState<MetaData[]>([]);
 
-    // Fetch artifacts from backend
-    const fetchArtifacts = async () =>{
-        try {
-            setLoading(true);
-            const res = await fetch("http://localhost:5000/artifacts", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify([
-                    {
-                        name: "*", // Wildcard to get all artifacts
-                        type: null // or "model" / "dataset" if you want to filter
-                    }
-                ])
-            });
-            const data = await res.json();
-            setArtifacts(data || []);
-        } catch (error) {
-            console.error("Error fetching artifacts:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
         <div className="p-4 bg-gray-500 text-white rounded-2xl shadow-lg">
             <h2 className="text-xl font-bold mb-4 text-center">Registered Artifacts</h2>
             
             <div className="flex flex-row items-center justify-center gap-3 mb-4">
                 <Upload />
-                <SearchByNameType 
-                    result={(data) => setArtifacts(data)}
-                />
+                <SearchByNameType result={(data) => setArtifacts(data)} />
                 <ModelByName onResults={(items) => setSearchResults(items)} />
             </div>
 
@@ -94,9 +67,7 @@ const Artifacts: React.FC = () => {
                 </div>
             )}
             
-            {loading ? (
-                <p className="text-gray-400 text-sm">Fetching artifacts...</p>
-            ) : artifacts.length > 0 ? (
+            {artifacts.length > 0 ? (
                 <div className="max-h-[32rem] overflow-y-auto pr-2">
                     <ul className="space-y-3">
                         {artifacts.map((a) => (
