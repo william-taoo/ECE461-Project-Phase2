@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 
+const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
+
 interface HealthComponent {
     id: string;
     display_name: string;
@@ -18,7 +20,7 @@ const Health: React.FC = () => {
     useEffect(() => {
         const fetchHealthStatus = async () => {
             try {
-                const statusRes = await fetch("http://localhost:5000/health");
+                const statusRes = await fetch(`${API_BASE}/health`);
                 const healthStatus = await statusRes.json();
                 setOverallStatus(healthStatus.status || "UNKNOWN");
             } catch (error) {
@@ -34,7 +36,7 @@ const Health: React.FC = () => {
     useEffect(() => {
         const fetchHealthComponents = async () => {
             try {
-                const componentRes = await fetch("http://localhost:5000/health/components");
+                const componentRes = await fetch(`${API_BASE}/health/components`);
                 const healthComponents = await componentRes.json();
                 setComponents(healthComponents.components || []);
             } catch (error) {
