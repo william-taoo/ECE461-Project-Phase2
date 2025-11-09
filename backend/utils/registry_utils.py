@@ -88,7 +88,10 @@ def iter_registry(registry):
             yield aid, item
 
 def save_registry(path: str, data):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    dirpath = os.path.dirname(os.path.abspath(path))
+    if dirpath and not os.path.exists(dirpath):
+        os.makedirs(dirpath, exist_ok=True)
+
     data = _as_dict(data)
     with open(path, "w") as f:
         json.dump(data, f, indent=4)
