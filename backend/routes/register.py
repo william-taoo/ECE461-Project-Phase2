@@ -39,7 +39,7 @@ def register_artifact(artifact_type: str):
             return jsonify({"error": "Artifact with this URL already exists"}), 409
 
     artifact_id = uuid.uuid4().hex
-    entry = {
+    response = {
         "metadata": {
             "id": artifact_id,
             "name": body.get("name") or os.path.basename(url) or "unnamed",
@@ -49,10 +49,52 @@ def register_artifact(artifact_type: str):
         "data": {"url": url},
     }
 
+    # Temporarily save
     if isinstance(registry, dict):
         registry[artifact_id] = entry
     else:
         registry.append(entry)
 
     save_registry(registry_path, registry)
+
+    # Rate the artifact
+    rate_url = f"http://localhost:5000/artifact/model/{artifact_id}/rate"
+    try:
+        response = requests.get(rate_url)
+        if response.status_code != 200:
+            del registry[artifact_id]
+            save_registry(registry_path, registry)
+            return jsonify({"error": f"Failed to rate model: {response.text}"}), 424
+        
+        rating = response.json()
+        net_score = rating.get("net_score", 0.0)
+
+        if net_score < 0.5:
+            # Reject artifact
+            del registry[artifact_id]
+            save_registry(registry_path, registry)
+            return jsonify({"error": f"Model rejected. Score too low: ({net_score}). Upload failed."}), 424
+        
+        # Save rating in artifact entry
+        final_entry = {
+            "metadata": {
+                "id": artifact_id,
+                "name": body.get("name") or os.path.basename(url) or "unnamed",
+                "version": body.get("version") or "0.0.1",
+                "type": artifact_type,
+                "rating": rating
+            },
+            "data": {"url": url},
+        }
+
+        if isinstance(registry, dict):
+            registry[artifact_id] = entry
+        else:
+            registry.append(entry)
+        save_registry(registry_path, registry)
+    except Exception as e:
+        del registry[artifact_id]
+        save_registry(registry_path, registry)
+        return jsonify({"error": f"Failed to rate model: {e}"}), 424
+    
     return jsonify(entry), 201

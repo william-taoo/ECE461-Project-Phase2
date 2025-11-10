@@ -5,6 +5,7 @@ from utils.registry_utils import (
     find_model_in_registry
 )
 from utils.time_utils import ms_to_seconds
+import requests
 
 ModelClass = None
 try:
