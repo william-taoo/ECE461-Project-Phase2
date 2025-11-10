@@ -7,7 +7,7 @@ from utils.registry_utils import load_registry, save_registry, infer_artifact_ty
 register_bp = Blueprint("artifact", __name__)
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
-
+API_BASE = "http://3.12.151.4:5000"
 
 @register_bp.route("/artifact/<artifact_type>", methods=["POST"])
 def register_artifact(artifact_type: str):
@@ -58,7 +58,7 @@ def register_artifact(artifact_type: str):
     save_registry(registry_path, registry)
 
     # Rate the artifact
-    rate_url = f"http://localhost:5000/artifact/model/{artifact_id}/rate"
+    rate_url = f"{API_BASE}/artifact/model/{artifact_id}/rate"
     try:
         response = requests.get(rate_url)
         if response.status_code != 200:
