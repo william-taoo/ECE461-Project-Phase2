@@ -70,7 +70,7 @@ app.register_blueprint(health_bp)
 app.register_blueprint(by_name_bp)
 
 
-# request/response logging
+# logging before request
 @app.before_request
 def log_request_info():
     logger.info(f"--->  {request.method} {request.path}")
@@ -79,10 +79,20 @@ def log_request_info():
         logger.debug(f"Body: {request.get_data(as_text=True)}")
 
 
+# logging after request
 @app.after_request
 def log_response_info(response):
     logger.info(f"<---  {response.status} ({request.method} {request.path})")
     return response
+
+
+# logging errors
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled exception: {e}\nTraceback:\n{tb}")
+    return {"error": str(e)}, 500
 
 
 @app.route("/tracks", methods=["GET"])
