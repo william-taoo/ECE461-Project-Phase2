@@ -35,11 +35,11 @@ app.config["API_KEY"] = os.getenv("API_KEY")
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 # File handler (append mode)
 file_handler = logging.FileHandler(LOG_FILE, mode="a")
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
 file_formatter = logging.Formatter(
     "%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -47,7 +47,7 @@ file_handler.setFormatter(file_formatter)
 
 # Stream handler (console)
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
+stream_handler.setLevel(logging.DEBUG)
 stream_formatter = logging.Formatter(
     "%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -59,7 +59,8 @@ if not logger.handlers:
     logger.addHandler(stream_handler)
 
 app.logger.handlers = logger.handlers
-app.logger.setLevel(logging.INFO)
+app.logger.setLevel(logging.DEBUG)
+
 
 # Register blueprints
 app.register_blueprint(register_bp)
