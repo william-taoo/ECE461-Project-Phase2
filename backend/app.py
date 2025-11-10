@@ -90,11 +90,14 @@ def log_request_info():
 def log_response_info(response):
     logger.info(f"<---  {response.status} ({request.method} {request.path})")
     logger.debug(f"Response headers: {dict(response.headers)}")
-    if response.data:
+
+    # Only read the body if it is not in direct passthrough
+    if not response.direct_passthrough and response.data:
         resp_text = response.get_data(as_text=True)
         if len(resp_text) > 1000:
             resp_text = resp_text[:1000] + "... [truncated]"
         logger.debug(f"Response body: {resp_text}")
+
     return response
 
 
