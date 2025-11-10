@@ -1,6 +1,7 @@
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 import os
+import logging
 from typing import cast
 from routes.register import register_bp
 from routes.rate import rate_bp
@@ -14,6 +15,19 @@ from routes.by_name import by_name_bp
 BASE_DIR = os.path.dirname(__file__)
 FRONTEND_BUILD_DIR = os.path.join(BASE_DIR, "../frontend/build")
 REGISTRY_PATH = os.path.join(BASE_DIR, "registry.json")
+
+# logging config
+LOG_FILE = os.path.join(BASE_DIR, "server.log")
+logging.basicConfig(
+    level=logging.INFO,  # use DEBUG for more detail
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE, mode="w"),
+        logging.StreamHandler()             
+    ]
+)
+
+logger = logging.getLogger("flask-app")
 
 app = Flask(
     __name__,
@@ -34,6 +48,21 @@ app.register_blueprint(retrieve_bp)
 app.register_blueprint(remove_bp)
 app.register_blueprint(health_bp)
 app.register_blueprint(by_name_bp)
+
+
+# request/response logging
+@app.before_request
+def log_request_info():
+    logger.info(f"--->  {request.method} {request.path}")
+    logger.debug(f"Headers: {dict(request.headers)}")
+    if request.data:
+        logger.debug(f"Body: {request.get_data(as_text=True)}")
+
+
+@app.after_request
+def log_response_info(response):
+    logger.info(f"<---  {response.status} ({request.method} {request.path})")
+    return response
 
 
 @app.route("/tracks", methods=["GET"])
