@@ -8,7 +8,6 @@ import ModelByName from "./ModelByName";
 interface MetaData {
     id: string;
     name: string;
-    version: string;
     type: string;
 }
 
@@ -47,10 +46,6 @@ const Artifacts: React.FC = () => {
                         key={m.id}
                         className="p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-gray-600 transition"
                         >
-                        <div className="flex items-center justify-between">
-                            <span className="font-semibold">{m.name}</span>
-                            <span className="text-sm text-gray-400">v{m.version}</span>
-                        </div>
                         <div className="text-sm text-gray-400">ID: {m.id}</div>
                         <div className="text-sm text-gray-400">Type: {m.type}</div>
 
@@ -78,7 +73,6 @@ const Artifacts: React.FC = () => {
                                 <div className="flex items-center justify-between">
                                     <span className="font-semibold">{a.metadata.name}</span>
                                     <span className="text-sm text-gray-400">
-                                    v{a.metadata.version}
                                     </span>
                                 </div>
                                 <div className="text-sm text-gray-400">

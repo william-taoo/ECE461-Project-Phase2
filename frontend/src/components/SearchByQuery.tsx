@@ -11,7 +11,6 @@ const SearchByQuery: React.FC<SearchByQueryProps> = ({ result }) => {
     const [show, setShow] = useState(false);
     const [searchName, setSearchName] = useState<string>("");
     const [searchType, setSearchType] = useState<string>("all");
-    const [searchVersion, setSearchVersion] = useState<string>("");
 
     const handleClose = () => setShow(false);
     const handleShow = () => setShow(true);
@@ -21,7 +20,6 @@ const SearchByQuery: React.FC<SearchByQueryProps> = ({ result }) => {
             const query = {
                 name: (searchName || "*").trim(),
                 type: searchType === "all" ? "all" : searchType,
-                version: searchVersion.trim(),
             };
 
             const endpoint = `${API_BASE}/artifacts`;
@@ -90,26 +88,6 @@ const SearchByQuery: React.FC<SearchByQueryProps> = ({ result }) => {
                                 <option value="code">Code</option>
                             </Form.Select>
                         </Form.Group>
-                        <Form.Group className="mb-1">
-                            <Form.Label>Version (SemverRange)</Form.Label>
-                            <Form.Control
-                                type="text"
-                                value={searchVersion}
-                                onChange={(e) => setSearchVersion(e.target.value)}
-                                placeholder={
-                                    `Examples: 
-                                    0.3.0 (exact) 
-                                    1.* (wildcard) 
-                                    >=1.2.0 (comparator) 
-                                    ^1.2.3 (caret) 
-                                    ~1.4.0 (tilde)
-                                    `
-                                }
-                            />
-                            <Form.Text>
-                                Leave blank to ignore version. Use only one style (exact, wildcard, comparator, caret, or tilde).
-                            </Form.Text>
-                            </Form.Group>
                     </Form>
                 </Modal.Body>
 

@@ -4,9 +4,8 @@ import { Button, Modal, Form } from "react-bootstrap";
 const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
 
 export interface MetaData {
-    id: string;
     name: string;
-    version: string;
+    id: string;
     type: string;
 }
 
@@ -103,7 +102,6 @@ const ModelByName: React.FC<Props> = ({ onResults }) => {
                     <thead>
                       <tr className="text-left border-b">
                         <th className="py-2 pr-4">Name</th>
-                        <th className="py-2 pr-4">Version</th>
                         <th className="py-2 pr-4">Type</th>
                         <th className="py-2">ID</th>
                       </tr>
@@ -112,7 +110,6 @@ const ModelByName: React.FC<Props> = ({ onResults }) => {
                       {results.map(r => (
                         <tr key={r.id} className="border-b">
                           <td className="py-2 pr-4">{r.name}</td>
-                          <td className="py-2 pr-4">{r.version}</td>
                           <td className="py-2 pr-4">{r.type}</td>
                           <td className="py-2 font-mono break-all">{r.id}</td>
                         </tr>
