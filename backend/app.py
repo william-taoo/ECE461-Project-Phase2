@@ -15,17 +15,7 @@ from routes.by_name import by_name_bp
 BASE_DIR = os.path.dirname(__file__)
 FRONTEND_BUILD_DIR = os.path.join(BASE_DIR, "../frontend/build")
 REGISTRY_PATH = os.path.join(BASE_DIR, "registry.json")
-
-# logging config
 LOG_FILE = os.path.join(BASE_DIR, "server.log")
-logging.basicConfig(
-    level=logging.INFO,  # use DEBUG for more detail
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE, mode="w"),
-        logging.StreamHandler()             
-    ]
-)
 
 logger = logging.getLogger("flask-app")
 
@@ -39,6 +29,36 @@ CORS(app)
 # confiure registry path
 app.config["REGISTRY_PATH"] = REGISTRY_PATH
 app.config["API_KEY"] = os.getenv("API_KEY")
+
+# Loggin setup
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# File handler (append mode)
+file_handler = logging.FileHandler(LOG_FILE, mode="a")
+file_handler.setLevel(logging.INFO)
+file_formatter = logging.Formatter(
+    "%(asctime)s - %(levelname)s - %(message)s"
+)
+file_handler.setFormatter(file_formatter)
+
+# Stream handler (console)
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+stream_formatter = logging.Formatter(
+    "%(asctime)s - %(levelname)s - %(message)s"
+)
+stream_handler.setFormatter(stream_formatter)
+
+# Add both handlers (if not already added)
+if not logger.handlers:
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+
+app.logger.handlers = logger.handlers
+app.logger.setLevel(logging.INFO)
 
 # Register blueprints
 app.register_blueprint(register_bp)
