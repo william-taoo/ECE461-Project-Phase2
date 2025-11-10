@@ -39,7 +39,7 @@ def register_artifact(artifact_type: str):
             return jsonify({"error": "Artifact with this URL already exists"}), 409
 
     artifact_id = uuid.uuid4().hex
-    response = {
+    entry = {
         "metadata": {
             "id": artifact_id,
             "name": body.get("name") or os.path.basename(url) or "unnamed",
@@ -88,9 +88,9 @@ def register_artifact(artifact_type: str):
         }
 
         if isinstance(registry, dict):
-            registry[artifact_id] = entry
+            registry[artifact_id] = final_entry
         else:
-            registry.append(entry)
+            registry.append(final_entry)
         save_registry(registry_path, registry)
     except Exception as e:
         del registry[artifact_id]
