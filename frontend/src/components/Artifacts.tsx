@@ -23,7 +23,7 @@ interface Artifact {
 const Artifacts: React.FC = () => {
     const [artifacts, setArtifacts] = useState<Artifact[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
-    const [selectedResult, setSelectedResult] = useState<any | null>(null);
+    const [rateResult, setRateResult] = useState<any | null>(null);
     const [searchResults, setSearchResults] = useState<MetaData[]>([]);
 
     return (
@@ -50,7 +50,7 @@ const Artifacts: React.FC = () => {
                         <div className="text-sm text-gray-400">Type: {m.type}</div>
 
                         <div className="mt-3 flex flex-row gap-3">
-                            <Rate artifactID={m.id} result={(data) => setSelectedResult(data)} />
+                            <Rate artifactID={m.id} result={(data) => setRateResult(data)} />
                             {/* No Download button here because the name-only endpoint
                                 doesn't return a URL. If you want Download, fetch by ID
                                 to get the full Artifact (with data.url) first. */}
@@ -89,7 +89,7 @@ const Artifacts: React.FC = () => {
                                     <Rate 
                                         artifactID={a.metadata.id}
                                         result={
-                                            (data) => setSelectedResult(data)
+                                            (data) => setRateResult(data)
                                         }
                                     />
                                     <Download />

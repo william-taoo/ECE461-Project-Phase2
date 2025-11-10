@@ -18,6 +18,13 @@ const Rate: React.FC<RateProps> = ({ artifactID, result }) => {
             });
             const data = await res.json();
             result(data);
+
+            const score = data.net_score ?? 0;
+            if (score > 0.5) {
+                alert(`Model accepted! Score: ${score.toFixed(2)}`);
+            } else {
+                alert(`Model rejected. Score too low: (${score.toFixed(2)}). Upload failed.`);
+            }
         } catch (error) {
             console.error("Error rating model:", error);
         }
