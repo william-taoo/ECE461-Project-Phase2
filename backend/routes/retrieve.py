@@ -96,7 +96,7 @@ def get_name(name: str):
     
     return jsonify(results), 200
 
-@retrieve_bp.route("/artifact/<artifact_type>/<id>", methods=["GET"])
+@retrieve_bp.route("/artifacts/<artifact_type>/<id>", methods=["GET"])
 def get_artifact(artifact_type: str, id: str):
     '''
     Retrieve artifact metadata by type and id
