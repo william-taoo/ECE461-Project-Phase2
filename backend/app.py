@@ -76,16 +76,25 @@ app.register_blueprint(put_bp)
 # logging before request
 @app.before_request
 def log_request_info():
-    logger.info(f"--->  {request.method} {request.path}")
+    logger.info(f"--->  {request.method} {request.path}?{request.query_string.decode()}")
     logger.debug(f"Headers: {dict(request.headers)}")
     if request.data:
-        logger.debug(f"Body: {request.get_data(as_text=True)}")
+        body_text = request.get_data(as_text=True)
+        if len(body_text) > 1000:
+            body_text = body_text[:1000] + "... [truncated]"
+        logger.debug(f"Body: {body_text}")
 
 
 # logging after request
 @app.after_request
 def log_response_info(response):
     logger.info(f"<---  {response.status} ({request.method} {request.path})")
+    logger.debug(f"Response headers: {dict(response.headers)}")
+    if response.data:
+        resp_text = response.get_data(as_text=True)
+        if len(resp_text) > 1000:
+            resp_text = resp_text[:1000] + "... [truncated]"
+        logger.debug(f"Response body: {resp_text}")
     return response
 
 
