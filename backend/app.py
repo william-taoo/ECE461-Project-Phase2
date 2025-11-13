@@ -1,7 +1,8 @@
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, jsonify, send_from_directory, request, g
 from flask_cors import CORS
 import os
 import logging
+import json
 from typing import cast
 from routes.register import register_bp
 from routes.rate import rate_bp
@@ -11,6 +12,7 @@ from routes.remove import remove_bp
 from routes.health import health_bp
 from routes.by_name import by_name_bp
 from routes.put import put_bp
+import time
 
 # paths
 BASE_DIR = os.path.dirname(__file__)
@@ -18,11 +20,9 @@ FRONTEND_BUILD_DIR = os.path.join(BASE_DIR, "../frontend/build")
 REGISTRY_PATH = os.path.join(BASE_DIR, "registry.json")
 LOG_FILE = os.path.join(BASE_DIR, "server.log")
 
-logger = logging.getLogger("flask-app")
-
 app = Flask(
     __name__,
-    static_folder=FRONTEND_BUILD_DIR,  # serve built React files
+    static_folder=FRONTEND_BUILD_DIR,
     static_url_path=""
 )
 CORS(app)
@@ -31,38 +31,30 @@ CORS(app)
 app.config["REGISTRY_PATH"] = REGISTRY_PATH
 app.config["API_KEY"] = os.getenv("API_KEY")
 
-# Loggin setup
+# logging setup
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-
-logger = logging.getLogger()
+logger = logging.getLogger("flask-app")
 logger.setLevel(logging.DEBUG)
 
-# File handler (append mode)
+# file handler (append mode)
 file_handler = logging.FileHandler(LOG_FILE, mode="a")
 file_handler.setLevel(logging.DEBUG)
-file_formatter = logging.Formatter(
-    "%(asctime)s - %(levelname)s - %(message)s"
-)
+file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
 
-# Stream handler (console)
+# stream handler (console)
 stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.DEBUG)
-stream_formatter = logging.Formatter(
-    "%(asctime)s - %(levelname)s - %(message)s"
-)
+stream_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 stream_handler.setFormatter(stream_formatter)
+logger.addHandler(stream_handler)
 
-# Add both handlers (if not already added)
-if not logger.handlers:
-    logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
-
+# ensure Flask uses our logger
 app.logger.handlers = logger.handlers
 app.logger.setLevel(logging.DEBUG)
 
-
-# Register blueprints
+# register blueprints
 app.register_blueprint(register_bp)
 app.register_blueprint(rate_bp)
 app.register_blueprint(download_bp)
@@ -73,35 +65,56 @@ app.register_blueprint(by_name_bp)
 app.register_blueprint(put_bp)
 
 
+# function to pretty print JSON in logs
+def pretty_json(data) -> str:
+    if isinstance(data, str):
+        try:
+            parsed = json.loads(data)
+            return json.dumps(parsed, indent=2)
+        except Exception:
+            return data
+    elif isinstance(data, dict) or isinstance(data, list):
+        return json.dumps(data, indent=2)
+    else:
+        return str(data)
+
+
 # logging before request
 @app.before_request
 def log_request_info():
+    g.start_time = time.time()
+    logger.info("\n" + "#" * 200)
     logger.info(f"--->  {request.method} {request.path}?{request.query_string.decode()}")
-    logger.debug(f"Headers: {dict(request.headers)}")
+    logger.info(f"Client IP: {request.remote_addr}")
+    logger.debug("Headers:\n%s", pretty_json(dict(request.headers)))
+
     if request.data:
         body_text = request.get_data(as_text=True)
+        body_text = pretty_json(body_text)
         if len(body_text) > 1000:
             body_text = body_text[:1000] + "... [truncated]"
-        logger.debug(f"Body: {body_text}")
+        logger.debug("Body:\n%s", body_text)
 
 
 # logging after request
 @app.after_request
 def log_response_info(response):
     logger.info(f"<---  {response.status} ({request.method} {request.path})")
-    logger.debug(f"Response headers: {dict(response.headers)}")
+    duration = time.time() - g.start_time
+    logger.info(f"Request duration: {duration:.3f}s")
+    logger.debug("Response headers:\n%s", pretty_json(dict(response.headers)))
 
-    # Only read the body if it is not in direct passthrough
     if not response.direct_passthrough and response.data:
         resp_text = response.get_data(as_text=True)
+        resp_text = pretty_json(resp_text)
         if len(resp_text) > 1000:
             resp_text = resp_text[:1000] + "... [truncated]"
-        logger.debug(f"Response body: {resp_text}")
+        logger.debug("Response body:\n%s", resp_text)
 
     return response
 
 
-# logging errors
+# error logging
 @app.errorhandler(Exception)
 def handle_exception(e):
     import traceback
@@ -110,29 +123,22 @@ def handle_exception(e):
     return {"error": str(e)}, 500
 
 
+# routes
 @app.route("/tracks", methods=["GET"])
 def get_track():
-    output = {
-        "plannedTracks": ["Performance track"]
-    }
-
-    if not output:
-        return jsonify({"error": "Error retrieving tracks"}), 500
-
+    output = {"plannedTracks": ["Performance track"]}
     return jsonify(output), 200
 
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_frontend(path):
-    static_folder = cast(str, app.static_folder)  # tell Pylance it's not None
-
-    if path != "" and os.path.exists(os.path.join(static_folder, path)):
+    static_folder = cast(str, app.static_folder)
+    if path and os.path.exists(os.path.join(static_folder, path)):
         return send_from_directory(static_folder, path)
-    else:
-        return send_from_directory(static_folder, "index.html")
+    return send_from_directory(static_folder, "index.html")
 
 
-# --- Entry Point ---
+# entry point
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
