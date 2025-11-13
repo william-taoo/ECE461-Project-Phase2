@@ -99,6 +99,7 @@ def log_request_info():
 # logging after request
 @app.after_request
 def log_response_info(response):
+    logger.info("\n" + "-" * 200)
     logger.info(f"<---  {response.status} ({request.method} {request.path})")
     duration = time.time() - g.start_time
     logger.info(f"Request duration: {duration:.3f}s")

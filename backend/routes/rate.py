@@ -9,7 +9,7 @@ import requests
 
 ModelClass = None
 try:
-    from CustomObjects.Model import Model as ModelClass  # type: ignore
+    from backend.CustomObjects.Model import Model as ModelClass  # type: ignore
 except Exception:
     try:
         from Model import Model as ModelClass  # type: ignore
