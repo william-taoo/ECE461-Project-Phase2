@@ -1,8 +1,7 @@
-from flask import Flask, jsonify, send_from_directory, request, g
+from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 import os
 import logging
-import json
 from typing import cast
 from routes.register import register_bp
 from routes.rate import rate_bp
@@ -12,7 +11,6 @@ from routes.remove import remove_bp
 from routes.health import health_bp
 from routes.by_name import by_name_bp
 from routes.put import put_bp
-import time
 
 # paths
 BASE_DIR = os.path.dirname(__file__)
@@ -65,52 +63,30 @@ app.register_blueprint(by_name_bp)
 app.register_blueprint(put_bp)
 
 
-# function to pretty print JSON in logs
-def pretty_json(data) -> str:
-    if isinstance(data, str):
-        try:
-            parsed = json.loads(data)
-            return json.dumps(parsed, indent=2)
-        except Exception:
-            return data
-    elif isinstance(data, dict) or isinstance(data, list):
-        return json.dumps(data, indent=2)
-    else:
-        return str(data)
-
-
 # logging before request
 @app.before_request
 def log_request_info():
-    g.start_time = time.time()
-    logger.info("\n" + "#" * 200)
-    logger.info(f"--->  {request.method} {request.path}?{request.query_string.decode()}")
-    logger.info(f"Client IP: {request.remote_addr}")
-    logger.debug("Headers:\n%s", pretty_json(dict(request.headers)))
+    logger.info(f"-------->  {request.method} {request.path}?{request.query_string.decode()}")
+    logger.debug(f"Headers: {dict(request.headers)}")
 
     if request.data:
         body_text = request.get_data(as_text=True)
-        body_text = pretty_json(body_text)
         if len(body_text) > 1000:
             body_text = body_text[:1000] + "... [truncated]"
-        logger.debug("Body:\n%s", body_text)
+        logger.debug(f"Body: {body_text}")
 
 
 # logging after request
 @app.after_request
 def log_response_info(response):
-    logger.info("\n" + "-" * 200)
-    logger.info(f"<---  {response.status} ({request.method} {request.path})")
-    duration = time.time() - g.start_time
-    logger.info(f"Request duration: {duration:.3f}s")
-    logger.debug("Response headers:\n%s", pretty_json(dict(response.headers)))
+    logger.info(f"<--------  {response.status} ({request.method} {request.path})")
+    logger.debug(f"Response headers: {dict(response.headers)}")
 
     if not response.direct_passthrough and response.data:
         resp_text = response.get_data(as_text=True)
-        resp_text = pretty_json(resp_text)
         if len(resp_text) > 1000:
             resp_text = resp_text[:1000] + "... [truncated]"
-        logger.debug("Response body:\n%s", resp_text)
+        logger.debug(f"Response body: {resp_text}")
 
     return response
 
@@ -118,9 +94,7 @@ def log_response_info(response):
 # error logging
 @app.errorhandler(Exception)
 def handle_exception(e):
-    import traceback
-    tb = traceback.format_exc()
-    logger.error(f"Unhandled exception: {e}\nTraceback:\n{tb}")
+    logger.error(f"Unhandled exception: {e}")
     return {"error": str(e)}, 500
 
 
