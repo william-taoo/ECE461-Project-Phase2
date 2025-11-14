@@ -58,7 +58,6 @@ jobs:
             key: ${{ secrets.EC2_SSH_KEY }}
             script: |
                 cd /home/ec2-user/projects/myapp/backend
-                sudo systemctl stop myapp || true
                 git reset --hard HEAD
                 git pull origin main
                 if [ ! -x ../venv/bin/python3 ]; then
@@ -72,5 +71,3 @@ jobs:
                 sudo systemctl stop myapp || true
                 sudo pkill -f 'gunicorn' || true
                 sudo systemctl restart myapp
-                sudo systemctl --no-pager --quiet status myapp || true
-                sudo journalctl -u myapp -n 50 --no-pager --output short || true
