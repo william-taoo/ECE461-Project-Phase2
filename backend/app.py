@@ -11,6 +11,12 @@ from routes.remove import remove_bp
 from routes.health import health_bp
 from routes.by_name import by_name_bp
 from routes.put import put_bp
+import sys
+
+# Add project root to sys.path so imports work
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # paths
 BASE_DIR = os.path.dirname(__file__)

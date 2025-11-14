@@ -1,32 +1,11 @@
-import sys
-import os
-
-# Add the project root to sys.path
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, jsonify, current_app
 from utils.registry_utils import (
     load_registry,
     save_registry,
     find_model_in_registry
 )
 from utils.time_utils import ms_to_seconds
-import requests
-
-ModelClass = None
-try:
-    from backend.CustomObjects.Model import Model as ModelClass  # type: ignore
-except Exception:
-    try: 
-        from CustomObjects.Model import Model as ModelClass
-    except Exception:
-        try:
-            from Model import Model as ModelClass  # type: ignore
-        except Exception:
-            ModelClass = None
+from CustomObjects.Model import Model as ModelClass
 
 
 rate_bp = Blueprint("rate", __name__)
@@ -45,7 +24,7 @@ def rate_model(id):
     of the model
     '''
     if ModelClass is None:
-        return jsonify({"error": "Model implementation unavailable"}), 500
+        return jsonify({"error": "Model implementation unavailable!"}), 500
 
     registry_path = current_app.config.get("REGISTRY_PATH")
     if not registry_path:
