@@ -801,6 +801,11 @@ class Model:
             self.reviewedness, self.reviewedness_latency = future_reviewedness.result()
             self.treescore, self.treescore_latency = future_treescore.result()
 
+        if self.reviewedness is None or float(self.reviewedness) < 0.0:
+            self.reviewedness = 0.0
+        if self.treescore is None:
+            self.treescore = 0.0
+
         # Example weights, can be adjusted based on importance
         weights: Dict[str, float] = {
             "license": 0.25,
@@ -815,36 +820,18 @@ class Model:
             "treescore": 0.02,
         }
 
-        components: Dict[str, Any] = {
-            "license": self.license_score,
-            "ramp_up_time": self.ramp_up_time,
-            "bus_factor": self.bus_factor,
-            "dataset_quality": getattr(self.dataset, "quality", 0.0),
-            "code_quality": getattr(self.code, "quality", 0.0),
-            "performance_claims": self.performance_claims,
-            "dataset_and_code_score": self.dataset_and_code_score,
-            "reproducibility": self.reproducibility,
-            "reviewedness": None if (self.reviewedness is None or float(self.reviewedness) < 0.0) else self.reviewedness,
-            "treescore": self.treescore if self.treescore is not None else None,
-        }
-
-        effective_weights: Dict[str, float] = {}
-        for k, w in weights.items():
-            v = components.get(k)
-            if v is None:
-                continue
-            if self._is_valid_score(v):
-                effective_weights[k] = float(w)
-
-        weight_sum = sum(effective_weights.values())
-        if weight_sum <= 0.0:
-            self.net_score = 0.0
-        else:
-            total = 0.0
-            for k, w in effective_weights.items():
-                v = self._clip01(components[k])
-                total += v * (w / weight_sum)
-            self.net_score = float(round(total, 4))
+        self.net_score = (
+            weights['license'] * self.license_score +
+            weights['ramp_up_time'] * self.ramp_up_time +
+            weights['bus_factor'] * self.bus_factor +
+            weights['dataset_quality'] * self.dataset.quality +
+            weights['code_quality'] * self.code.quality +
+            weights['performance_claims'] * self.performance_claims +
+            weights['dataset_and_code_score'] * self.dataset_and_code_score +
+            weights['reproducibility'] * self.reproducibility +
+            weights['reviewedness'] * self.reviewedness +
+            weights['treescore'] * self.treescore
+        )
 
         self.net_score_latency = (
             self.size_score_latency +
@@ -859,6 +846,5 @@ class Model:
             self.reviewedness_latency +
             self.treescore_latency
         )
-
 
         return self.net_score
