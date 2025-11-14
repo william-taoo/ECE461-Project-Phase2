@@ -771,82 +771,80 @@ class Model:
 
 
     def compute_net_score(self, api_key: str) -> float:
-        # """
-        # Computes the net score for the model by aggregating various metrics.
-        # Returns:
-        #     A float score between 0.0 and 1.0 representing the net score.
-        # """
-        # with concurrent.futures.ThreadPoolExecutor() as executor:
-        #     future_size = executor.submit(self.time_metric, self.get_size)
-        #     future_license = executor.submit(self.time_metric, self.get_license)
-        #     future_ramp_up_time = executor.submit(self.time_metric, self.get_ramp_up_time, api_key=api_key)
-        #     future_bus_factor = executor.submit(self.time_metric, self.get_bus_factor)
-        #     future_performance_claims = executor.submit(self.time_metric, self.get_performance_claims, api_key=api_key)
-        #     future_dataset_quality = executor.submit(self.time_metric, self.dataset.get_quality, api_key=api_key)
-        #     future_code_quality = executor.submit(self.time_metric, self.code.get_quality)
-        #     future_dataset_and_code_score = executor.submit(self.time_metric, self.get_dataset_and_code_score)
-        #     future_reproducibility = executor.submit(self.time_metric, self.get_reproducibility)
-        #     future_reviewedness = executor.submit(self.time_metric, self.get_reviewedness)
-        #     future_treescore = executor.submit(self.time_metric, self.get_treescore)
+        """
+        Computes the net score for the model by aggregating various metrics.
+        Returns:
+            A float score between 0.0 and 1.0 representing the net score.
+        """
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_size = executor.submit(self.time_metric, self.get_size)
+            future_license = executor.submit(self.time_metric, self.get_license)
+            future_ramp_up_time = executor.submit(self.time_metric, self.get_ramp_up_time, api_key=api_key)
+            future_bus_factor = executor.submit(self.time_metric, self.get_bus_factor)
+            future_performance_claims = executor.submit(self.time_metric, self.get_performance_claims, api_key=api_key)
+            future_dataset_quality = executor.submit(self.time_metric, self.dataset.get_quality, api_key=api_key)
+            future_code_quality = executor.submit(self.time_metric, self.code.get_quality)
+            future_dataset_and_code_score = executor.submit(self.time_metric, self.get_dataset_and_code_score)
+            future_reproducibility = executor.submit(self.time_metric, self.get_reproducibility)
+            future_reviewedness = executor.submit(self.time_metric, self.get_reviewedness)
+            future_treescore = executor.submit(self.time_metric, self.get_treescore)
 
-        #     self.size_score, self.size_score_latency = future_size.result()
-        #     self.license_score, self.license_latency = future_license.result()
-        #     self.ramp_up_time, self.ramp_up_time_latency = future_ramp_up_time.result()
-        #     self.bus_factor, self.bus_factor_latency = future_bus_factor.result()
-        #     self.performance_claims, self.performance_claims_latency = future_performance_claims.result()
-        #     self.dataset.quality, self.dataset_quality_latency = future_dataset_quality.result()
-        #     self.code.quality, self.code_quality_latency = future_code_quality.result()
-        #     self.dataset_and_code_score, self.dataset_and_code_score_latency = future_dataset_and_code_score.result()
-        #     self.reproducibility, self.reproducibility_latency = future_reproducibility.result()
-        #     self.reviewedness, self.reviewedness_latency = future_reviewedness.result()
-        #     self.treescore, self.treescore_latency = future_treescore.result()
+            self.size_score, self.size_score_latency = future_size.result()
+            self.license_score, self.license_latency = future_license.result()
+            self.ramp_up_time, self.ramp_up_time_latency = future_ramp_up_time.result()
+            self.bus_factor, self.bus_factor_latency = future_bus_factor.result()
+            self.performance_claims, self.performance_claims_latency = future_performance_claims.result()
+            self.dataset.quality, self.dataset_quality_latency = future_dataset_quality.result()
+            self.code.quality, self.code_quality_latency = future_code_quality.result()
+            self.dataset_and_code_score, self.dataset_and_code_score_latency = future_dataset_and_code_score.result()
+            self.reproducibility, self.reproducibility_latency = future_reproducibility.result()
+            self.reviewedness, self.reviewedness_latency = future_reviewedness.result()
+            self.treescore, self.treescore_latency = future_treescore.result()
 
-        # if self.reviewedness is None or float(self.reviewedness) < 0.0:
-        #     self.reviewedness = 0.0
-        # if self.treescore is None:
-        #     self.treescore = 0.0
+        if self.reviewedness is None or float(self.reviewedness) < 0.0:
+            self.reviewedness = 0.0
+        if self.treescore is None:
+            self.treescore = 0.0
 
-        # # Example weights, can be adjusted based on importance
-        # weights: Dict[str, float] = {
-        #     "license": 0.25,
-        #     "ramp_up_time": 0.30,
-        #     "bus_factor": 0.10,
-        #     "dataset_quality": 0.095,
-        #     "code_quality": 0.005,
-        #     "performance_claims": 0.20,
-        #     "dataset_and_code_score": 0.05,
-        #     "reproducibility": 0.08,
-        #     "reviewedness": 0.04,
-        #     "treescore": 0.02,
-        # }
+        # Example weights, can be adjusted based on importance
+        weights: Dict[str, float] = {
+            "license": 0.25,
+            "ramp_up_time": 0.30,
+            "bus_factor": 0.10,
+            "dataset_quality": 0.095,
+            "code_quality": 0.005,
+            "performance_claims": 0.20,
+            "dataset_and_code_score": 0.05,
+            "reproducibility": 0.08,
+            "reviewedness": 0.04,
+            "treescore": 0.02,
+        }
 
-        # self.net_score = (
-        #     weights['license'] * self.license_score +
-        #     weights['ramp_up_time'] * self.ramp_up_time +
-        #     weights['bus_factor'] * self.bus_factor +
-        #     weights['dataset_quality'] * self.dataset.quality +
-        #     weights['code_quality'] * self.code.quality +
-        #     weights['performance_claims'] * self.performance_claims +
-        #     weights['dataset_and_code_score'] * self.dataset_and_code_score +
-        #     weights['reproducibility'] * self.reproducibility +
-        #     weights['reviewedness'] * self.reviewedness +
-        #     weights['treescore'] * self.treescore
-        # )
+        self.net_score = (
+            weights['license'] * self.license_score +
+            weights['ramp_up_time'] * self.ramp_up_time +
+            weights['bus_factor'] * self.bus_factor +
+            weights['dataset_quality'] * self.dataset.quality +
+            weights['code_quality'] * self.code.quality +
+            weights['performance_claims'] * self.performance_claims +
+            weights['dataset_and_code_score'] * self.dataset_and_code_score +
+            weights['reproducibility'] * self.reproducibility +
+            weights['reviewedness'] * self.reviewedness +
+            weights['treescore'] * self.treescore
+        )
 
-        # self.net_score_latency = (
-        #     self.size_score_latency +
-        #     self.license_latency +
-        #     self.ramp_up_time_latency +
-        #     self.bus_factor_latency +
-        #     self.performance_claims_latency +
-        #     self.dataset_quality_latency +
-        #     self.code_quality_latency +
-        #     self.dataset_and_code_score_latency +
-        #     self.reproducibility_latency +
-        #     self.reviewedness_latency +
-        #     self.treescore_latency
-        # )
-
-        self.net_score = 0.6
+        self.net_score_latency = (
+            self.size_score_latency +
+            self.license_latency +
+            self.ramp_up_time_latency +
+            self.bus_factor_latency +
+            self.performance_claims_latency +
+            self.dataset_quality_latency +
+            self.code_quality_latency +
+            self.dataset_and_code_score_latency +
+            self.reproducibility_latency +
+            self.reviewedness_latency +
+            self.treescore_latency
+        )
 
         return self.net_score
