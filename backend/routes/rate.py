@@ -7,8 +7,15 @@ from utils.registry_utils import (
 from utils.time_utils import ms_to_seconds
 import requests
 
-from CustomObjects.Model import Model as ModelClass
-    
+ModelClass = None
+try: 
+    from CustomObjects.Model import Model as ModelClass
+except Exception:
+    try:
+        from Model import Model as ModelClass  # type: ignore
+    except Exception:
+        ModelClass = None
+
 
 rate_bp = Blueprint("rate", __name__)
 
