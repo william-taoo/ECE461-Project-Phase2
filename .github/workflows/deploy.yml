@@ -58,17 +58,19 @@ jobs:
             key: ${{ secrets.EC2_SSH_KEY }}
             script: |
                 cd /home/ec2-user/projects/myapp/backend
-                source /home/ec2-user/projects/myapp/venv/bin/activate
-                git pull origin main || true
-                pip install -r /home/ec2-user/projects/myapp/requirements.txt
-                sudo systemctl restart myapp
-
-                cd /home/ec2-user/projects/myapp/backend
                 sudo systemctl stop myapp || true
-                git reset --hard HEAD  # optional: clean any local changes
+                git reset --hard HEAD
                 git pull origin main
-                source /home/ec2-user/projects/myapp/venv/bin/activate
-                pip install -r requirements.txt
+                if [ ! -x ../venv/bin/python3 ]; then
+                  python3 -m venv ../venv
+                fi
+                source ../venv/bin/activate
+                pip install --upgrade pip
+                pip install -r /home/ec2-user/projects/myapp/requirements.txt
+
                 sudo systemctl daemon-reload
-                sudo systemctl restart myapp
+                sudo systemctl stop myapp || true
+                sudo pkill -f 'gunicorn' || true
+                sudo systemctl start myapp
                 sudo systemctl status myapp --no-pager
+                sudo journalctl -u myapp -n 200 --no-pager
