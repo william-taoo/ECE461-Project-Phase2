@@ -1,10 +1,3 @@
-# import sys
-# import os
-
-# # Ensure backend directory is in Python path
-# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# sys.path.insert(0, BASE_DIR)
-
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import (
     load_registry,
