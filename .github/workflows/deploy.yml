@@ -62,3 +62,13 @@ jobs:
                 git pull origin main || true
                 pip install -r /home/ec2-user/projects/myapp/requirements.txt
                 sudo systemctl restart myapp
+
+                cd /home/ec2-user/projects/myapp/backend
+                sudo systemctl stop myapp || true
+                git reset --hard HEAD  # optional: clean any local changes
+                git pull origin main
+                source /home/ec2-user/projects/myapp/venv/bin/activate
+                pip install -r requirements.txt
+                sudo systemctl daemon-reload
+                sudo systemctl restart myapp
+                sudo systemctl status myapp --no-pager
