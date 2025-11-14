@@ -1,3 +1,14 @@
+import sys
+import os
+
+# Ensure backend directory is in Python path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # backend/
+sys.path.insert(0, BASE_DIR)
+
+# Optional: also add parent directory if CustomObjects is above backend
+PARENT_DIR = os.path.dirname(BASE_DIR)
+sys.path.insert(0, PARENT_DIR)
+
 from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 import os

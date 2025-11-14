@@ -1,3 +1,10 @@
+import sys
+import os
+
+# Ensure backend directory is in Python path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
+
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import (
     load_registry,
@@ -8,13 +15,10 @@ from utils.time_utils import ms_to_seconds
 import requests
 
 ModelClass = None
-try: 
+try:
     from CustomObjects.Model import Model as ModelClass
-except Exception:
-    try:
-        from Model import Model as ModelClass  # type: ignore
-    except Exception:
-        ModelClass = None
+except Exception as e:
+    ModelClass = None
 
 
 rate_bp = Blueprint("rate", __name__)
