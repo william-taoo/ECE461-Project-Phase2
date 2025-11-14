@@ -94,7 +94,9 @@ def log_response_info(response):
 # error logging
 @app.errorhandler(Exception)
 def handle_exception(e):
-    logger.error(f"Unhandled exception: {e}")
+    import traceback
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled exception: {e}\nTraceback:\n{tb}")
     return {"error": str(e)}, 500
 
 
