@@ -7,7 +7,8 @@ from utils.registry_utils import load_registry, save_registry, infer_artifact_ty
 register_bp = Blueprint("artifact", __name__)
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
-API_BASE = "http://3.12.151.4:5000"
+# API_BASE = "http://3.12.151.4:5000"
+API_BASE = "http://127.0.0.1:5000"
 
 @register_bp.route("/artifact/<artifact_type>", methods=["POST"])
 def register_artifact(artifact_type: str):
