@@ -71,6 +71,6 @@ jobs:
                 sudo systemctl daemon-reload
                 sudo systemctl stop myapp || true
                 sudo pkill -f 'gunicorn' || true
-                sudo systemctl start myapp
-                sudo systemctl status myapp --no-pager
-                sudo journalctl -u myapp -n 200 --no-pager
+                sudo systemctl restart myapp
+                sudo systemctl --no-pager --quiet status myapp || true
+                sudo journalctl -u myapp -n 50 --no-pager --output short || true
