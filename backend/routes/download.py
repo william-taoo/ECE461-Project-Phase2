@@ -2,7 +2,8 @@ from flask import Blueprint, jsonify, request, send_file, current_app
 import os
 from utils.registry_utils import (
     load_registry,
-    find_model_in_registry
+    find_model_in_registry,
+    add_to_audit
 )
 
 
@@ -29,5 +30,11 @@ def download_model(model_id):
     file_path = model["path"]
     if not os.path.exists(file_path):
         return jsonify({"error": "Model file not found"}), 404
+    
+    # Add to audit
+    name = "Name" # Change this later
+    admin = False # Change this later
+    artifact_name = model["metadata"]["name"]
+    add_to_audit(name, admin, "model", model_id, artifact_name, "DOWNLOAD")
     
     return send_file(file_path, as_attachment=True)

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from utils.registry_utils import load_registry
+from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
 import re
 import fnmatch
 
@@ -160,11 +160,18 @@ def get_audit(artifact_type: str, id: str):
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
     
+    # Add to audit
+    name = "Name" # Change this later
+    admin = False # Change this later
+    artifact_name = artifact["metadata"]["name"]
+    add_to_audit(name, admin, artifact_type, id, artifact_name, "AUDIT") 
+    
     # Get audit log 
-    # - go in audit and retrieve id
-    audits = []
-
-    return jsonify(audits), 200
+    audit = get_audit_entries(id)
+    if audit == None:
+        return jsonify({"error": "Error with audit log"}), 400
+    else:
+        return jsonify(audit), 200
 
 @retrieve_bp.route("/artifact/model/<id>/lineage", methods=["GET"])
 def get_lineage(id: str):

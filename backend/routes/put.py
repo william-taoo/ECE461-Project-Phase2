@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from utils.registry_utils import load_registry, save_registry
+from utils.registry_utils import load_registry, save_registry, add_to_audit
 import jwt
 from datetime import datetime, timezone, timedelta
 
@@ -30,6 +30,12 @@ def update_artifact(artifact_type: str, id: str):
     # Replace the artifact contents
     registry[id] = data
     save_registry(registry_path, registry)
+
+    # Add to audit
+    name = "Name" # Change this later
+    admin = False # Change this later
+    artifact_name = data["metadata"]["name"]
+    add_to_audit(name, admin, artifact_type, id, artifact_name, "UPDATE")
 
     return jsonify({"message": "Artifact updated"}), 200
 

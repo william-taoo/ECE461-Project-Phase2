@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import (
     load_registry,
     save_registry,
-    find_model_in_registry
+    find_model_in_registry,
+    add_to_audit
 )
 from utils.time_utils import ms_to_seconds
 import requests
@@ -116,6 +117,13 @@ def rate_model(id):
     entry["rating"] = response
     registry[id] = entry
     save_registry(registry_path, registry)
+
+    # Add to audit
+    name = "Name" # Change this later
+    admin = False # Change this later
+    artifact_type = data["metadata"]["type"]
+    artifact_name = data["metadata"]["name"]
+    add_to_audit(name, admin, artifact_type, id, artifact_name, "RATE")
 
     return jsonify(response), 200
     

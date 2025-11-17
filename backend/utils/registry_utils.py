@@ -1,6 +1,8 @@
 import json
 import os
 from urllib.parse import urlparse
+from pathlib import Path
+from datetime import datetime, timezone
 
 HF_HOSTS = {"huggingface.co", "hf.co"}
 CODE_HOSTS = {
@@ -11,6 +13,51 @@ MODEL_EXTS = (
     ".pt", ".safetensors", ".bin", ".onnx", ".pb", ".tflite",
     ".ckpt", ".gguf", ".ggml", ".zip", ".tar", ".tar.gz", ".whl"
 )
+AUDIT_ACTIONS = ["CREATE", "UPDATE", "DOWNLOAD", "RATE", "AUDIT"]
+AUDIT_DIR = Path("audit_logs")
+
+def audit_path(artifact_id: str):
+    path = AUDIT_DIR
+    path.mkdir(parents=True, exist_ok=True)
+    return path / f"{artifact_id}.json"
+
+def add_to_audit(user: str, admin: bool, artifact_type: str, artifact_id: str, artifact_name: str, action: str):
+    if action not in AUDIT_ACTIONS:
+        return None # Return status 400
+
+    path = audit_path(artifact_id)
+    entry = {
+        "user": {
+            "name": user,
+            "admin": admin
+        },
+        "date": datetime.now(timezone.utc).isoformat() + "Z",
+        "artifact": {
+            "name": artifact_name,
+            "id": artifact_id,
+            "type": artifact_type,
+        },
+        "action": action
+    }
+
+    if path.exists():
+        with open(path, "r") as f:
+            data = json.load(f)
+    else:
+        data = []
+
+    data.append(entry)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=4)
+
+def get_audit_entries(artifact_id):
+    path = audit_path(artifact_id)
+
+    if not path.exists():
+        return None # Return status 404
+
+    with open(path, "r") as f:
+        return json.load(f)
 
 def infer_artifact_type(url: str) -> str:
     """

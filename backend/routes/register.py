@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 import os
 import uuid
 import requests
-from utils.registry_utils import load_registry, save_registry, infer_artifact_type
+from utils.registry_utils import load_registry, save_registry, infer_artifact_type, add_to_audit
 from huggingface_hub import HfApi
 from urllib.parse import urlparse
 
@@ -56,10 +56,11 @@ def register_artifact(artifact_type: str):
         return jsonify({"error": "Artifact is too large"}), 424
 
     artifact_id = uuid.uuid4().hex
+    artifact_name = body.get("name") or os.path.basename(url) or "unnamed"
     entry = {
         "metadata": {
             "id": artifact_id,
-            "name": body.get("name") or os.path.basename(url) or "unnamed",
+            "name": artifact_name,
             "version": body.get("version") or "0.0.1",
             "type": artifact_type,
         },
@@ -97,7 +98,7 @@ def register_artifact(artifact_type: str):
         final_entry = {
             "metadata": {
                 "id": artifact_id,
-                "name": body.get("name") or os.path.basename(url) or "unnamed",
+                "name": artifact_name,
                 "version": body.get("version") or "0.0.1",
                 "type": artifact_type,
                 "rating": rating
@@ -114,5 +115,10 @@ def register_artifact(artifact_type: str):
         del registry[artifact_id]
         save_registry(registry_path, registry)
         return jsonify({"error": f"Failed to rate model: {e}"}), 424
+    
+    # Add to audit
+    name = "Name" # Change this later
+    admin = False # Change this later
+    add_to_audit(name, admin, artifact_type, artifact_id, artifact_name, "CREATE") 
     
     return jsonify(entry), 201
