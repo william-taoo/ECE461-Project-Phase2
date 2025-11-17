@@ -122,12 +122,12 @@ def rate_model(id):
     registry[id] = entry
     save_registry(registry_path, registry)
 
-    # Add to audit
-    name = "Name" # Change this later
-    admin = False # Change this later
-    artifact_type = data["metadata"]["type"]
-    artifact_name = data["metadata"]["name"]
-    add_to_audit(name, admin, artifact_type, id, artifact_name, "RATE")
+    # # Add to audit
+    # name = "Name" # Change this later
+    # admin = False # Change this later
+    # artifact_type = data["metadata"]["type"]
+    # artifact_name = data["metadata"]["name"]
+    # add_to_audit(name, admin, artifact_type, id, artifact_name, "RATE")
 
     return jsonify(response), 200
     

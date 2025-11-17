@@ -66,49 +66,50 @@ def register_artifact(artifact_type: str):
     save_registry(registry_path, registry)
 
     # Rate the artifact
-    base = request.host_url.rstrip('/')
-    rate_url = f"{base}/artifact/model/{artifact_id}/rate"
-    try:
-        response = requests.get(rate_url)
-        if response.status_code != 200:
+    if artifact_type == "model":
+        base = request.host_url.rstrip('/')
+        rate_url = f"{base}/artifact/model/{artifact_id}/rate"
+        try:
+            response = requests.get(rate_url)
+            if response.status_code != 200:
+                del registry[artifact_id]
+                save_registry(registry_path, registry)
+                return jsonify({"error": f"Failed to rate model: {response.text}"}), 424
+            
+            rating = response.json()
+            net_score = rating.get("net_score", 0.0)
+
+            if net_score < 0.5:
+                # Reject artifact
+                del registry[artifact_id]
+                save_registry(registry_path, registry)
+                return jsonify({"error": f"Model rejected. Score too low: ({net_score}). Upload failed."}), 424
+            
+            # Save rating in artifact entry
+            final_entry = {
+                "metadata": {
+                    "id": artifact_id,
+                    "name": artifact_name,
+                    "version": body.get("version") or "0.0.1",
+                    "type": artifact_type,
+                    "rating": rating
+                },
+                "data": {"url": url},
+            }
+
+            if isinstance(registry, dict):
+                registry[artifact_id] = final_entry
+            else:
+                registry.append(final_entry)
+            save_registry(registry_path, registry)
+        except Exception as e:
             del registry[artifact_id]
             save_registry(registry_path, registry)
-            return jsonify({"error": f"Failed to rate model: {response.text}"}), 424
-        
-        rating = response.json()
-        net_score = rating.get("net_score", 0.0)
-
-        if net_score < 0.5:
-            # Reject artifact
-            del registry[artifact_id]
-            save_registry(registry_path, registry)
-            return jsonify({"error": f"Model rejected. Score too low: ({net_score}). Upload failed."}), 424
-        
-        # Save rating in artifact entry
-        final_entry = {
-            "metadata": {
-                "id": artifact_id,
-                "name": artifact_name,
-                "version": body.get("version") or "0.0.1",
-                "type": artifact_type,
-                "rating": rating
-            },
-            "data": {"url": url},
-        }
-
-        if isinstance(registry, dict):
-            registry[artifact_id] = final_entry
-        else:
-            registry.append(final_entry)
-        save_registry(registry_path, registry)
-    except Exception as e:
-        del registry[artifact_id]
-        save_registry(registry_path, registry)
-        return jsonify({"error": f"Failed to rate model: {e}"}), 424
+            return jsonify({"error": f"Failed to rate model: {e}"}), 424
     
-    # Add to audit
-    name = "Name" # Change this later
-    admin = False # Change this later
-    add_to_audit(name, admin, artifact_type, artifact_id, artifact_name, "CREATE") 
+    # # Add to audit
+    # name = "Name" # Change this later
+    # admin = False # Change this later
+    # add_to_audit(name, admin, artifact_type, artifact_id, artifact_name, "CREATE") 
     
     return jsonify(entry), 201
