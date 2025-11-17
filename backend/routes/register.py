@@ -5,6 +5,7 @@ import requests
 from utils.registry_utils import load_registry, save_registry, infer_artifact_type, add_to_audit
 from huggingface_hub import HfApi
 from urllib.parse import urlparse
+from utils.artifact_size import get_artifact_size
 
 register_bp = Blueprint("artifact", __name__)
 
@@ -39,18 +40,7 @@ def register_artifact(artifact_type: str):
         if entry.get("data", {}).get("url") == url:
             return jsonify({"error": "Artifact with this URL already exists"}), 409
         
-    # Check size limit, if the artifact is >5GB, reject it
-    path_parts = urlparse(url).path.strip('/').split('/')
-    if len(path_parts) < 2:
-        return jsonify({"error": "Invalid URL"}), 400
-    repo_id = f"{path_parts[0]}/{path_parts[1]}"
-
-    # Use the HfApi to get model info, which includes file sizes
-    api = HfApi()
-    model_info = api.model_info(repo_id=repo_id, files_metadata=True)
-
-    # Sum the size of all files in the repository
-    total_size = sum(file.size for file in model_info.siblings if file.size is not None)
+    total_size = get_artifact_size(url, artifact_type)
 
     if total_size > 5 * 1024**3:
         return jsonify({"error": "Artifact is too large"}), 424
