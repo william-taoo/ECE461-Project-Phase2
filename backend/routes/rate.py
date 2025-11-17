@@ -8,11 +8,14 @@ from utils.registry_utils import (
 from utils.time_utils import ms_to_seconds
 import requests
 
-ModelClass = None
 try:
     from CustomObjects.Model import Model as ModelClass
+    from CustomObjects.Code import Code as CodeClass
+    from CustomObjects.Dataset import Dataset as DatasetClass
 except Exception as e:
     ModelClass = None
+    CodeClass = None
+    DatasetClass = None
 
 
 rate_bp = Blueprint("rate", __name__)
@@ -32,6 +35,10 @@ def rate_model(id):
     '''
     if ModelClass is None:
         return jsonify({"error": "Model implementation unavailable"}), 500
+    if CodeClass is None:
+        return jsonify({"error": "Code implementation unavailable"}), 500
+    if DatasetClass is None:
+        return jsonify({"error": "Model implementation unavailable"}), 500
 
     registry_path = current_app.config.get("REGISTRY_PATH")
     if not registry_path:
@@ -44,9 +51,6 @@ def rate_model(id):
     
     metadata = entry.get("metadata") or {}
     data = entry.get("data") or {}
-
-    if (metadata.get("type") or "").lower() != "model":
-        return jsonify({"error": "Rating is only supported for artifact_type=model."}), 400
 
     model_url = (data.get("url") or "").strip()
     dataset_url = (data.get("dataset_url") or metadata.get("dataset_url") or "").strip()
