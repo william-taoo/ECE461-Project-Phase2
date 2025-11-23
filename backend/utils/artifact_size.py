@@ -23,21 +23,22 @@ def normalize_hf_url(url: str) -> str:
 
 
 def normalize_github_url(url: str) -> str:
-    # Remove ".git" at the end if present
+    # Remove .git
     if url.endswith(".git"):
         url = url[:-4]
 
-    # Convert Git URL to API URL
-    # Examples:
-    # https://github.com/user/repo   -> https://api.github.com/repos/user/repo
-    # git@github.com:user/repo.git    -> https://api.github.com/repos/user/repo
-    if "github.com" in url:
-        parts = url.replace("git@", "").replace("https://", "").replace("http://", "")
-        parts = parts.replace("github.com:", "github.com/")  # handle SSH form
-        owner_repo = parts.split("github.com/")[1]
-        return f"https://api.github.com/repos/{owner_repo}"
+    # Normalize structure
+    url = url.replace("git@", "").replace("https://", "").replace("http://", "")
+    url = url.replace("github.com:", "github.com/")
 
-    return url
+    # Split after github.com/
+    parts = url.split("github.com/")[1].split("/")
+
+    owner = parts[0]
+    repo = parts[1]
+
+    # Ignore branch paths / tree / blob / main / folder etc.
+    return f"https://api.github.com/repos/{owner}/{repo}"
 
 
 def split_hf_repo(parts):
