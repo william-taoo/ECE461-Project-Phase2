@@ -22,6 +22,24 @@ def normalize_hf_url(url: str) -> str:
     return f"https://huggingface.co/{path}"
 
 
+def normalize_github_url(url: str) -> str:
+    # Remove ".git" at the end if present
+    if url.endswith(".git"):
+        url = url[:-4]
+
+    # Convert Git URL to API URL
+    # Examples:
+    # https://github.com/user/repo   -> https://api.github.com/repos/user/repo
+    # git@github.com:user/repo.git    -> https://api.github.com/repos/user/repo
+    if "github.com" in url:
+        parts = url.replace("git@", "").replace("https://", "").replace("http://", "")
+        parts = parts.replace("github.com:", "github.com/")  # handle SSH form
+        owner_repo = parts.split("github.com/")[1]
+        return f"https://api.github.com/repos/{owner_repo}"
+
+    return url
+
+
 def split_hf_repo(parts):
     """
     Correctly split Hugging Face repo paths.
@@ -85,11 +103,11 @@ def get_artifact_size(url: str, artifact_type: str) -> int:
 
     # GitHub
     if host == "github.com":
-        owner, repo = parts[0], parts[1]
-        api_url = f"https://api.github.com/repos/{owner}/{repo}"
+        api_url = normalize_github_url(url)
         r = requests.get(api_url, timeout=5)
         r.raise_for_status()
         data = r.json()
         return data["size"] / 1024   # GitHub reports KB → bytes
 
-    raise ValueError("Unsupported host (must be GitHub or Hugging Face)")
+    # return 0 if unsupported type (not GitHub or Hugging Face)
+    return 0
