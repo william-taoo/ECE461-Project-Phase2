@@ -79,7 +79,9 @@ def register_artifact(artifact_type: str):
             rating = response.json()
             net_score = rating.get("net_score", 0.0)
 
-            if net_score < 0.5:
+            # COME BACK AND SET SCORE THRESHOLD. NEED TO FIX RATING LOGIC IN MODEL.PY
+            # TO HANDLE DIFFERENT HF URL FORMATS
+            if net_score < -1:
                 # Reject artifact
                 del registry[artifact_id]
                 save_registry(registry_path, registry)

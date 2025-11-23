@@ -2,59 +2,94 @@ from huggingface_hub import HfApi
 import requests
 from urllib.parse import urlparse
 
+
+def normalize_hf_url(url: str) -> str:
+    """
+    Normalize Hugging Face URLs and allow single-segment repos.
+    """
+    if url.startswith("hf://"):
+        return "https://huggingface.co/" + url[len("hf://"):]
+
+    parsed = urlparse(url)
+
+    if parsed.netloc != "huggingface.co":
+        raise ValueError("Invalid repository URL: must point to huggingface.co")
+
+    path = parsed.path.strip("/")
+    if path == "":
+        raise ValueError("Invalid repository URL: missing path")
+
+    return f"https://huggingface.co/{path}"
+
+
+def split_hf_repo(parts):
+    """
+    Correctly split Hugging Face repo paths.
+    Handles:
+      ["repo"]
+      ["owner", "repo"]
+      ["datasets", "repo"]
+      ["datasets", "owner", "repo"]
+    Returns (owner, repo, repo_id)
+    """
+
+    # Case 1: single-segment repo
+    if len(parts) == 1:
+        repo = parts[0]
+        return None, repo, repo   # repo_id = repo
+
+    # Case 2: datasets/<repo>
+    if parts[0] == "datasets":
+        if len(parts) == 2:
+            repo = parts[1]
+            return None, repo, repo
+        else:
+            owner, repo = parts[1], parts[2]
+            return owner, repo, f"{owner}/{repo}"
+
+    # Case 3: normal owner/repo
+    owner, repo = parts[0], parts[1]
+    return owner, repo, f"{owner}/{repo}"
+
+
 def get_artifact_size(url: str, artifact_type: str) -> int:
     """
     Returns artifact size in bytes.
-    Supports Hugging Face models + datasets and GitHub repos.
+    Now correctly supports single-segment HF repos.
     """
 
-    # deconstruct URL
+    # Normalize if model
+    if "huggingface.co" in url:
+        url = normalize_hf_url(url)
+
     parsed = urlparse(url)
     host = parsed.netloc
     parts = parsed.path.strip("/").split("/")
 
-    if len(parts) < 2:
-        raise ValueError("Invalid repository URL")
-
-    # Hugging Face models and datasets
-    if "huggingface.co" in host:
+    # HuggingFace
+    if host == "huggingface.co":
         api = HfApi()
 
-        # check if dataset
-        if parts[0] == "datasets" and artifact_type == "dataset":
-            if len(parts) < 3:
-                raise ValueError("Invalid HF dataset URL")
-            owner, repo = parts[1], parts[2]
-            info = api.dataset_info(repo_id=f"{owner}/{repo}", files_metadata=True)
-            files = info.siblings
+        owner, repo, repo_id = split_hf_repo(parts)
 
-        # check if code
-        elif artifact_type == "model":
-            owner, repo = parts[0], parts[1]
-            info = api.model_info(repo_id=f"{owner}/{repo}", files_metadata=True)
-            files = info.siblings
-        
+        if artifact_type == "dataset":
+            info = api.dataset_info(repo_id, files_metadata=True)
         else:
-            raise ValueError("Hugging Face artifact not dataset or model")
+            info = api.model_info(repo_id, files_metadata=True)
 
-        if files:
-            total_size = sum(f.size for f in files if f.size)
-            return total_size
-        else:
-            raise ValueError("Could not get files")
+
+        if not info.siblings:
+            raise ValueError("No files found in repository")
+
+        return sum(f.size for f in info.siblings if f.size)
 
     # GitHub
-    if "github.com" in host:
+    if host == "github.com":
         owner, repo = parts[0], parts[1]
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
         r = requests.get(api_url, timeout=5)
         r.raise_for_status()
         data = r.json()
-
-        if "size" not in data:
-            raise ValueError("Could not determine size from GitHub API")
-
-        # GitHub size = KB, return bytes
-        return data["size"] / 1024
+        return data["size"] / 1024   # GitHub reports KB → bytes
 
     raise ValueError("Unsupported host (must be GitHub or Hugging Face)")

@@ -33,6 +33,10 @@ def rate_model(id):
     - Treescore: Average of the total model scores of all parents
     of the model
     '''
+
+    # ADD LOGIC TO CHECK REGISTRY FOR UPLOADED DATASET AND CODE ASSOCIATED WITH THE MODEL
+    # IF DATASET AND CODE ARE PRESENT, USE THEM IN NET SCORE, OTHERWISE, SCORE WITH JUST MODEL URL
+
     if ModelClass is None:
         return jsonify({"error": "Model implementation unavailable"}), 500
     if CodeClass is None:
