@@ -38,10 +38,10 @@ const ModelByName: React.FC<Props> = ({ onResults }) => {
         setResults([]);
     
         try {
-            const token =
-                localStorage.getItem("authToken") ||
-                process.env.REACT_APP_AUTH_TOKEN ||
-                "bearer demo-token";
+            // const token =
+            //     localStorage.getItem("authToken") ||
+            //     process.env.REACT_APP_AUTH_TOKEN ||
+            //     "bearer demo-token";
     
             const res = await fetch(`${API_BASE}/artifact/byName/${encodeURIComponent(q)}`, {
             method: "GET",
@@ -64,6 +64,7 @@ const ModelByName: React.FC<Props> = ({ onResults }) => {
           setError(e?.message ?? "Network or server error.");
         } finally {
           setLoading(false);
+          handleClose();
         }
     };
 
@@ -96,7 +97,7 @@ const ModelByName: React.FC<Props> = ({ onResults }) => {
                 {error && <div className="text-red-600 text-sm">{error}</div>}
               </Form>
     
-              {results.length > 0 && (
+              {/* {results.length > 0 && (
                 <div className="mt-3 overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
@@ -117,7 +118,7 @@ const ModelByName: React.FC<Props> = ({ onResults }) => {
                     </tbody>
                   </table>
                 </div>
-              )}
+              )} */}
             </Modal.Body>
     
                 <Modal.Footer>
