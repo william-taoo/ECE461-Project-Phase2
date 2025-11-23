@@ -11,6 +11,10 @@ def reset_registry():
     Reset registry to default system state
     Delete all artifacts
     '''
+    permission = True
+    if not permission:
+        return jsonify({"error": "Permission denied"}), 401
+
     default = {} # Can change to whatever default
     registry_path = current_app.config["REGISTRY_PATH"]
     save_registry(registry_path, default)

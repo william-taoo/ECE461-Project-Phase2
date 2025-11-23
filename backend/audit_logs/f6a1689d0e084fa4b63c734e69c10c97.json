@@ -1,0 +1,15 @@
+[
+    {
+        "user": {
+            "name": "Name",
+            "admin": false
+        },
+        "date": "2025-11-23T22:22:26.711774+00:00Z",
+        "artifact": {
+            "name": "TinyLlama-1.1B-Chat-v1.0",
+            "id": "f6a1689d0e084fa4b63c734e69c10c97",
+            "type": "model"
+        },
+        "action": "UPDATE"
+    }
+]

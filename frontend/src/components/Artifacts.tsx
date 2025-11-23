@@ -26,7 +26,6 @@ const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").rep
 const Artifacts: React.FC = () => {
     const [queryArtifacts, setQueryArtifacts] = useState<Artifact[]>([]);
     const [searchByNameArtifacts, setSearchByNameArtifacts] = useState<MetaData[]>([]);
-
     const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
     const [showInspectModal, setShowInspectModal] = useState(false);
 

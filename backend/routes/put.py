@@ -21,20 +21,21 @@ def update_artifact(artifact_type: str, id: str):
     
     # Verify id and type match
     old_artifact = registry[id]
+    print(old_artifact)
     if (
-        old_artifact["metadata"]["id"] != data["metadata"]["id"]
+        old_artifact["metadata"]["id"] != id
         or old_artifact["metadata"]["type"] != artifact_type
     ):
         return jsonify({"error": "ID or type mismatch"}), 400
 
     # Replace the artifact contents
-    registry[id] = data
+    registry[id]["data"] = data
     save_registry(registry_path, registry)
 
     # Add to audit
     name = "Name" # Change this later
     admin = False # Change this later
-    artifact_name = data["metadata"]["name"]
+    artifact_name = old_artifact["metadata"]["name"]
     add_to_audit(name, admin, artifact_type, id, artifact_name, "UPDATE")
 
     return jsonify({"message": "Artifact updated"}), 200
