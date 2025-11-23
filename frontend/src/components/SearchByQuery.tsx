@@ -8,7 +8,7 @@ interface SearchByQueryProps {
 const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
 
 const SearchByQuery: React.FC<SearchByQueryProps> = ({ result }) => {
-    const [show, setShow] = useState(false);
+    const [show, setShow] = useState<boolean>(false);
     const [searchName, setSearchName] = useState<string>("");
     const [searchType, setSearchType] = useState<string>("all");
 

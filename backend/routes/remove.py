@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, save_registry
+import os
 
 
 remove_bp = Blueprint("remove", __name__)
@@ -10,6 +11,10 @@ def reset_registry():
     Reset registry to default system state
     Delete all artifacts
     '''
+    data = request.get_json()
+    if data.get("password") != os.environ["RESET_PASSWORD"]:
+        return jsonify({"error": "Incorrect password"}), 401
+
     default = {} # Can change to whatever default
     registry_path = current_app.config["REGISTRY_PATH"]
     save_registry(registry_path, default)

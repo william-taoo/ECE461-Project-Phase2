@@ -33,7 +33,7 @@ def health_check_components():
     # Might need to change depending on what health diagnosis we have
     components = [{
         "id": "registry",
-        "display_name": "Model Registry File Example",
+        "display_name": "Artifact Registry",
         "status": "OK" if registry_ok else "ERROR",
         "observed_at": now,
         "description": "Tracks all registered artifacts and their metadata.",

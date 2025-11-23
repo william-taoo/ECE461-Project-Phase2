@@ -22,7 +22,6 @@ interface Artifact {
 
 const Artifacts: React.FC = () => {
     const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-    const [loading, setLoading] = useState<boolean>(false);
     const [rateResult, setRateResult] = useState<any | null>(null);
     const [searchResults, setSearchResults] = useState<MetaData[]>([]);
 
@@ -38,27 +37,27 @@ const Artifacts: React.FC = () => {
 
             {searchResults.length > 0 && (
                 <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">Search Results (by name)</h3>
-                <div className="max-h-[20rem] overflow-y-auto pr-2">
-                    <ul className="space-y-3">
-                    {searchResults.map((m) => (
-                        <li
-                        key={m.id}
-                        className="p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-gray-600 transition"
-                        >
-                        <div className="text-sm text-gray-400">ID: {m.id}</div>
-                        <div className="text-sm text-gray-400">Type: {m.type}</div>
+                    <h3 className="text-lg font-semibold mb-2">Search Results (by name)</h3>
+                    <div className="max-h-[20rem] overflow-y-auto pr-2">
+                        <ul className="space-y-3">
+                        {searchResults.map((m) => (
+                            <li
+                                key={m.id}
+                                className="p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-gray-600 transition"
+                            >
+                                <div className="text-sm text-gray-400">ID: {m.id}</div>
+                                <div className="text-sm text-gray-400">Type: {m.type}</div>
 
-                        <div className="mt-3 flex flex-row gap-3">
-                            <Rate artifactID={m.id} result={(data) => setRateResult(data)} />
-                            {/* No Download button here because the name-only endpoint
-                                doesn't return a URL. If you want Download, fetch by ID
-                                to get the full Artifact (with data.url) first. */}
-                        </div>
-                        </li>
-                    ))}
-                    </ul>
-                </div>
+                                <div className="mt-3 flex flex-row gap-3">
+                                    <Rate artifactID={m.id} result={(data) => setRateResult(data)} />
+                                    {/* No Download button here because the name-only endpoint
+                                        doesn't return a URL. If you want Download, fetch by ID
+                                        to get the full Artifact (with data.url) first. */}
+                                </div>
+                            </li>
+                        ))}
+                        </ul>
+                    </div>
                 </div>
             )}
             
@@ -72,8 +71,7 @@ const Artifacts: React.FC = () => {
                             >
                                 <div className="flex items-center justify-between">
                                     <span className="font-semibold">{a.metadata.name}</span>
-                                    <span className="text-sm text-gray-400">
-                                    </span>
+                                    <span className="text-sm text-gray-400"></span>
                                 </div>
                                 <div className="text-sm text-gray-400">
                                     ID: {a.metadata.id}
