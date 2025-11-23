@@ -11,10 +11,6 @@ def reset_registry():
     Reset registry to default system state
     Delete all artifacts
     '''
-    data = request.get_json()
-    if data.get("password") != os.environ["RESET_PASSWORD"]:
-        return jsonify({"error": "Incorrect password"}), 401
-
     default = {} # Can change to whatever default
     registry_path = current_app.config["REGISTRY_PATH"]
     save_registry(registry_path, default)
