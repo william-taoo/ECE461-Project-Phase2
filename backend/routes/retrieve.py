@@ -71,30 +71,46 @@ def get_artifacts():
 
     return response, 200
 
+# @retrieve_bp.route("/artifact/byName/<name>", methods=["GET"])
+# def get_name(name: str):
+#     '''
+#     Return the metadata of the artifacts that match the
+#     provided name
+#     '''
+#     # Check if name is valid
+#     if not name or name.strip() == "":
+#         return jsonify({"error": "Missing or invalid artifact name"}), 400
+
+#     registry_path = current_app.config["REGISTRY_PATH"]
+#     registry = load_registry(registry_path)
+#     results = []
+
+#     for artifact in registry.values():
+#         artifact_name = artifact.get("metadata", {}).get("name", "")
+#         if name.lower() == artifact_name.lower():
+#             results.append(artifact)
+    
+#     # If no results
+#     if len(results) == 0:
+#         return jsonify({"error": "No artifacts found"}), 404
+    
+#     return jsonify(results), 200
+
 @retrieve_bp.route("/artifact/byName/<name>", methods=["GET"])
 def get_name(name: str):
-    '''
-    Return the metadata of the artifacts that match the
-    provided name
-    '''
-    # Check if name is valid
+
     if not name or name.strip() == "":
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
     registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
-    results = []
 
     for artifact in registry.values():
         artifact_name = artifact.get("metadata", {}).get("name", "")
         if name.lower() == artifact_name.lower():
-            results.append(artifact)
-    
-    # If no results
-    if len(results) == 0:
-        return jsonify({"error": "No artifacts found"}), 404
-    
-    return jsonify(results), 200
+            return jsonify(artifact), 200
+
+    return jsonify({"error": "No artifacts found"}), 404
 
 @retrieve_bp.route("/artifacts/<artifact_type>/<id>", methods=["GET"])
 def get_artifact(artifact_type: str, id: str):
