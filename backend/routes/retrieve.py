@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
 import re
 import fnmatch
+import os
+import json
 
 
 retrieve_bp = Blueprint("retrieve", __name__)
@@ -71,46 +73,38 @@ def get_artifacts():
 
     return response, 200
 
-# @retrieve_bp.route("/artifact/byName/<name>", methods=["GET"])
-# def get_name(name: str):
-#     '''
-#     Return the metadata of the artifacts that match the
-#     provided name
-#     '''
-#     # Check if name is valid
-#     if not name or name.strip() == "":
-#         return jsonify({"error": "Missing or invalid artifact name"}), 400
-
-#     registry_path = current_app.config["REGISTRY_PATH"]
-#     registry = load_registry(registry_path)
-#     results = []
-
-#     for artifact in registry.values():
-#         artifact_name = artifact.get("metadata", {}).get("name", "")
-#         if name.lower() == artifact_name.lower():
-#             results.append(artifact)
-    
-#     # If no results
-#     if len(results) == 0:
-#         return jsonify({"error": "No artifacts found"}), 404
-    
-#     return jsonify(results), 200
-
 @retrieve_bp.route("/artifact/byName/<name>", methods=["GET"])
 def get_name(name: str):
-
+    '''
+    Return the metadata of the artifacts that match the
+    provided name
+    '''
+    # Check if name is valid
     if not name or name.strip() == "":
         return jsonify({"error": "Missing or invalid artifact name"}), 400
-
+    # print(f"NAME -----> {name}")
+    
     registry_path = current_app.config["REGISTRY_PATH"]
+        
     registry = load_registry(registry_path)
+    # print(registry)
+    results = []
 
     for artifact in registry.values():
+        # print(artifact)
         artifact_name = artifact.get("metadata", {}).get("name", "")
+        # print(f"ARTIFACT_NAME -----> {artifact_name}")
         if name.lower() == artifact_name.lower():
-            return jsonify(artifact), 200
+            results.append(artifact)
+            # print(f"METADATA -----> {artifact["metadata"]}")
 
-    return jsonify({"error": "No artifacts found"}), 404
+    
+    # If no results
+    if len(results) == 0:
+        return jsonify({"error": "No artifacts found"}), 404
+    
+    return jsonify(results[0]), 200
+
 
 @retrieve_bp.route("/artifacts/<artifact_type>/<id>", methods=["GET"])
 def get_artifact(artifact_type: str, id: str):
