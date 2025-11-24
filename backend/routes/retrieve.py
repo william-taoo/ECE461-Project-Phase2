@@ -88,7 +88,7 @@ def get_name(name: str):
     for artifact in registry.values():
         artifact_name = artifact.get("metadata", {}).get("name", "")
         if name.lower() == artifact_name.lower():
-            results.append(artifact["metadata"])
+            results.append(artifact)
     
     # If no results
     if len(results) == 0:
