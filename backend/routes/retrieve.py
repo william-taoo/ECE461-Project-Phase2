@@ -95,7 +95,7 @@ def get_name(name: str):
         artifact_name = artifact.get("metadata", {}).get("name", "")
         # print(f"ARTIFACT_NAME -----> {artifact_name}")
         if name.lower() == artifact_name.lower():
-            results.append(artifact)
+            results.append(artifact["metadata"])
             # print(f"METADATA -----> {artifact["metadata"]}")
 
     
