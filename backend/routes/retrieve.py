@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
+from collections import OrderedDict
 import re
 import fnmatch
 import os
@@ -73,7 +74,7 @@ def get_artifacts():
 
     return response, 200
 
-@retrieve_bp.route("/artifact/byName/<name>", methods=["GET"])
+@retrieve_bp.route("/artifacts/byName/<name>", methods=["GET"])
 def get_name(name: str):
     """
     Return metadata for all artifacts matching the given name
@@ -88,13 +89,12 @@ def get_name(name: str):
     results = []
     for artifact in registry.values():
         metadata = artifact.get("metadata", {})
-        artifact_name = metadata.get("name", "")
-        if name.lower() == artifact_name.lower():
-            results.append({
-                "name": metadata.get("name"),
-                "id": metadata.get("id"),
-                "type": metadata.get("type")
-            })
+        if metadata.get("name", "").lower() == name.lower():
+            results.append(OrderedDict([
+                ("name", metadata.get("name")),
+                ("id", metadata.get("id")),
+                ("type", metadata.get("type"))
+            ]))
 
     if not results:
         return jsonify({"error": "No artifacts found"}), 404
