@@ -74,7 +74,7 @@ def get_artifacts():
 
     return response, 200
 
-@retrieve_bp.route("/artifacts/byName/<name>", methods=["GET"])
+@retrieve_bp.route("/artifact/byName/<name>", methods=["GET"])
 def get_name(name: str):
     """
     Return metadata for all artifacts matching the given name
