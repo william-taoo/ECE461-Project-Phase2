@@ -95,7 +95,7 @@ def get_name(name: str):
     if not results:
         return jsonify({"error": "No artifacts found"}), 404
 
-    return jsonify(results[0]), 200
+    return jsonify(results), 200
 
 
 @retrieve_bp.route("/artifacts/<artifact_type>/<id>", methods=["GET"])
