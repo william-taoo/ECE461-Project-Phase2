@@ -74,7 +74,7 @@ def get_artifacts():
 
     return response, 200
 
-@retrieve_bp.route("/artifact/byName/<name>", methods=["GET"])
+@retrieve_bp.route("/artifact/byName/<name>", methods=["GET"], strict_slashes=False)
 def get_name(name: str):
     """
     Return metadata for all artifacts matching the given name
@@ -87,10 +87,18 @@ def get_name(name: str):
     registry = load_registry(registry_path)
 
     results = []
-    for artifact in registry.values():
+    query = name.strip().lower()
+
+    for artifact_id, artifact in registry.items():
         metadata = artifact.get("metadata", {})
-        if metadata.get("name", "").lower() == name.lower():
-            results.append(artifact["metadata"])
+        artifact_name = metadata.get("name", "").strip().lower()
+
+        if artifact_name == query:
+            results.append({
+                "id": artifact_id,
+                "name": metadata.get("name"),
+                "type": metadata.get("type")
+            })
 
     if not results:
         return jsonify({"error": "No artifacts found"}), 404
