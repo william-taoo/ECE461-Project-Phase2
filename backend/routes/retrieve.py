@@ -1,10 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
-from collections import OrderedDict
 import re
 import fnmatch
-import os
-import json
 import typing
 
 retrieve_bp = Blueprint("retrieve", __name__)
@@ -148,7 +145,6 @@ def get_artifact(artifact_type: str, id: str):
     full.update(normalized)
     return jsonify(full), 200
 
-
 @retrieve_bp.route("/artifact/<artifact_type>/<id>/cost", methods=["GET"], strict_slashes=False)
 def get_cost(artifact_type: str, id: str):
     """
@@ -168,9 +164,9 @@ def get_cost(artifact_type: str, id: str):
         return jsonify({"error": "Artifact not found"}), 404
 
     try:
-        # Placeholder costs; replace with real calculation
-        standalone_cost = 15
-        total_cost = 15
+        # Force numeric costs (float) to avoid Unset/int comparison errors
+        standalone_cost = float(artifact.get("standalone_cost") or 0)
+        total_cost = float(artifact.get("total_cost") or 0)
 
         if dependency:
             response = {
