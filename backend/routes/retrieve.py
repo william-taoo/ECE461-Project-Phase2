@@ -90,16 +90,12 @@ def get_name(name: str):
     for artifact in registry.values():
         metadata = artifact.get("metadata", {})
         if metadata.get("name", "").lower() == name.lower():
-            results.append(OrderedDict([
-                ("name", metadata.get("name")),
-                ("id", metadata.get("id")),
-                ("type", metadata.get("type"))
-            ]))
+            results.append(artifact["metadata"])
 
     if not results:
         return jsonify({"error": "No artifacts found"}), 404
 
-    return jsonify(results), 200
+    return jsonify(results[0]), 200
 
 
 @retrieve_bp.route("/artifacts/<artifact_type>/<id>", methods=["GET"])
