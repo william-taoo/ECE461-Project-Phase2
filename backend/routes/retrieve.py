@@ -9,17 +9,18 @@ retrieve_bp = Blueprint("retrieve", __name__)
 
 def serialize_artifact(artifact_id: str, artifact: dict) -> dict:
     """
-    Return a normalized artifact dict expected by the autograder/tests.
-
-    Always include the fields the grader expects. Use defaults when missing.
+    Return a normalized artifact dict.
     """
+    # get artifact metadata
     metadata = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
-    # If metadata has id, prefer the dictionary key (artifact_id) as canonical id.
+    
+    # if metadata has id, prefer the dictionary key (artifact_id) as canonical id.
     return {
         "id": str(artifact_id),
         "name": metadata.get("name", "") if isinstance(metadata, dict) else "",
         "type": metadata.get("type", "") if isinstance(metadata, dict) else "",
         "version": metadata.get("version", "") if isinstance(metadata, dict) else "",
+        
         # keep original metadata object (empty dict if missing)
         "metadata": metadata if isinstance(metadata, dict) else {}
     }
@@ -28,15 +29,14 @@ def serialize_artifact(artifact_id: str, artifact: dict) -> dict:
 @retrieve_bp.route("/artifacts", methods=["POST"], strict_slashes=False)
 def get_artifacts():
     """
-    Query artifacts by name/type/version. Accepts both:
-      - {"name": "...", "type": "...", "version": "..."}   (body JSON)
-      - [ { ... } ] (autograder single-element list format)
-    Returns a paginated list of serialized artifacts.
+    This will send a request for models in the registry 
+    given a name and type
     """
+    # get path to registry
     registry_path = current_app.config.get("REGISTRY_PATH")
     registry = load_registry(registry_path)
 
-    # parse JSON safely (handle autograder single-element list)
+    # parse JSON safely (handle single element list) 
     query = request.get_json(force=True, silent=True)
     if isinstance(query, list) and len(query) == 1:
         query = query[0]
@@ -44,6 +44,7 @@ def get_artifacts():
     if not query or not isinstance(query, dict):
         return jsonify({"error": "Invalid request format"}), 400
 
+    # query parameters
     name_query = str(query.get("name", "*")).strip()
     type_query = str(query.get("type", "all")).strip().lower()
     version_query = str(query.get("version", "")).strip()
@@ -81,7 +82,7 @@ def get_artifacts():
 
         results.append(serialize_artifact(artifact_id, artifact))
 
-    # limit guard
+    # limit guard if too many artifacts are returned
     if len(results) > 100:
         return jsonify({"error": "Too many artifacts returned"}), 413
 
@@ -97,23 +98,27 @@ def get_artifacts():
 def get_name(name: str):
     """
     Return metadata for all artifacts matching the provided name.
-    Returns a list of serialized artifacts (possibly empty -> 404).
+    Returns a list of serialized artifacts.
     """
+    # handle missing artifact name
     if not name or not name.strip():
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
+    # get path to registry
     registry_path = current_app.config.get("REGISTRY_PATH")
     registry = load_registry(registry_path)
 
     results = []
     query = name.strip().lower()
 
+    # append artifacts that match the name query
     for artifact_id, artifact in registry.items():
         metadata = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
         artifact_name = str(metadata.get("name", "")).strip().lower() if isinstance(metadata, dict) else ""
         if artifact_name == query:
             results.append(serialize_artifact(artifact_id, artifact))
 
+    # handle no results
     if not results:
         return jsonify({"error": "No artifacts found"}), 404
 
@@ -126,8 +131,11 @@ def get_artifact(artifact_type: str, id: str):
     Retrieve the full stored artifact entry by id. We return the raw artifact object
     but ensure it includes id/name/type/version/metadata via serialization.
     """
+    # get path to registry
     registry_path = current_app.config.get("REGISTRY_PATH")
     registry = load_registry(registry_path)
+
+    # get artifact by id
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
@@ -139,32 +147,38 @@ def get_artifact(artifact_type: str, id: str):
 
     # return the full artifact but normalized fields at top-level for safety
     normalized = serialize_artifact(id, artifact)
-    # also include the rest of the artifact payload (files/dependencies etc.) if present
+
+    # also include the rest of the artifact payload if present
     full = dict(artifact) if isinstance(artifact, dict) else {}
+
     # overwrite top-level id/name/type/version/metadata with normalized values
     full.update(normalized)
     return jsonify(full), 200
 
+
 @retrieve_bp.route("/artifact/<artifact_type>/<id>/cost", methods=["GET"], strict_slashes=False)
 def get_cost(artifact_type: str, id: str):
     """
-    Return cost for an artifact in the format expected by the autograder:
-    - dependency=false: { "<id>": { "total_cost": <num> } }
-    - dependency=true:  { "<id>": { "standalone_cost": <num>, "total_cost": <num> } }
+    Return cost for an artifact.
     """
+    # check for dependencies
     dependency = request.args.get("dependency", "false").lower() == "true"
 
+    # handle missing artifact type or id
     if not artifact_type or not id:
         return jsonify({"error": "Missing field(s)"}), 400
 
+    # get path to registry
     registry_path = current_app.config.get("REGISTRY_PATH")
     registry = load_registry(registry_path)
+
+    # get artifact
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
 
+    # INSERT COST CALCULATIONS HERE
     try:
-        # Force numeric costs (float) to avoid Unset/int comparison errors
         standalone_cost = float(artifact.get("standalone_cost") or 0)
         total_cost = float(artifact.get("total_cost") or 0)
 
@@ -190,58 +204,74 @@ def get_cost(artifact_type: str, id: str):
 
 @retrieve_bp.route("/artifact/<artifact_type>/<id>/audit", methods=["GET"], strict_slashes=False)
 def get_audit(artifact_type: str, id: str):
+    '''
+    Get the audit log for an artifact
+    '''
     if not artifact_type or not id:
         return jsonify({"error": "Missing field(s)"}), 400
-
-    registry_path = current_app.config.get("REGISTRY_PATH")
+    
+    
+    registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
-
-    artifact_name = artifact.get("metadata", {}).get("name", "")
-    # add a sensible default actor if you have auth; keep "system" otherwise
-    add_to_audit("system", False, artifact_type, id, artifact_name, "AUDIT")
-
+    
+    # add to audit
+    name = "Name" # Change this later
+    admin = False # Change this later
+    artifact_name = artifact["metadata"]["name"]
+    add_to_audit(name, admin, artifact_type, id, artifact_name, "AUDIT") 
+    
+    # get audit log 
     audit = get_audit_entries(id)
-    if audit is None:
+    if audit == None:
         return jsonify({"error": "Error with audit log"}), 400
-    return jsonify(audit), 200
+    else:
+        return jsonify(audit), 200
 
 
-@retrieve_bp.route("/artifact/model/<id>/lineage", methods=["GET"], strict_slashes=False)
+@retrieve_bp.route("/artifact/model/<id>/lineage", methods=["GET"])
 def get_lineage(id: str):
+    '''
+    Get the lineage graph of an artifact
+    '''
     if not id:
         return jsonify({"error": "Missing field"}), 400
-
-    registry_path = current_app.config.get("REGISTRY_PATH")
+    
+    registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
-
-    # Default empty lineage; implement real lineage if you have it
+    
+    # get lineage graph
     lineage = {}
+
     return jsonify(lineage), 200
 
 
-@retrieve_bp.route("/artifact/model/<id>/license-check", methods=["POST"], strict_slashes=False)
+@retrieve_bp.route("/artifact/model/<id>/license-check", methods=["POST"])
 def check_license(id: str):
-    data = request.get_json(force=True, silent=True)
+    '''
+    Check if the license is compatible
+    '''
+    data = request.get_json()
     if not data or "github_url" not in data:
         return jsonify({"error": "Missing github_url"}), 400
-
+    
     url = data["github_url"]
-    # Placeholder validity check; replace with real check if desired
     valid_url = True
     if not valid_url:
         return jsonify({"error": "Invalid github URL"}), 404
-
+    
+    # Check license
     try:
         compatible = True
-        return jsonify({"id": id, "compatible": compatible}), 200
-    except Exception:
+    except:
         return jsonify({"error": "License information couldn't be retrieved"}), 502
+
+    return jsonify(compatible), 200
 
 
 @retrieve_bp.route("/artifact/byRegEx", methods=["POST"], strict_slashes=False)
@@ -270,7 +300,6 @@ def get_by_regex():
     for artifact_id, artifact in registry.items():
         metadata = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
         name = str(metadata.get("name", ""))
-        artifact_type = metadata.get("type", "")
         if compiled_regex.search(name):
             matches.append(serialize_artifact(artifact_id, artifact))
 
