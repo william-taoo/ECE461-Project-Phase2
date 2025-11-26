@@ -71,6 +71,10 @@ def split_hf_repo(parts):
     return owner, repo, f"{owner}/{repo}"
 
 
+def is_unset(value):
+    return type(value).__name__ == "_Unset"
+
+
 def get_artifact_size(url: str, artifact_type: str) -> int:
     """
     Returns artifact size in bytes.
@@ -96,11 +100,16 @@ def get_artifact_size(url: str, artifact_type: str) -> int:
         else:
             info = api.model_info(repo_id, files_metadata=True)
 
-
         if not info.siblings:
             raise ValueError("No files found in repository")
 
-        return sum(f.size for f in info.siblings if f.size)
+        total = 0
+        for f in info.siblings:
+            size = f.size
+            if size is None or is_unset(size):
+                continue
+            total += size
+        return total
 
     # GitHub
     if host == "github.com":

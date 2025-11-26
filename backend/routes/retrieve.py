@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
+from utils.artifact_size import get_artifact_size
 import re
 import fnmatch
 import typing
@@ -209,10 +210,15 @@ def get_cost(artifact_type: str, id: str):
         return jsonify({"error": "Artifact not found"}), 404
 
     # INSERT COST CALCULATIONS HERE
-
+    artifact_data = artifact.get("data")
+    artifact_url = artifact_data.get("url")
     try:
-        standalone_cost = float(artifact.get("standalone_cost") or 0)
-        total_cost = float(artifact.get("total_cost") or 0)
+        standalone_cost = float(get_artifact_size(artifact_url, artifact_type))
+        if not standalone_cost:
+            standalone_cost = 0.0
+
+        # FIX THIS LOGIC
+        total_cost = standalone_cost
 
         if dependency:
             response = {
