@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
+from utils.lineage_utils import load_config_for_artifact, build_lineage_graph, LineageComputationError
 import re
 import fnmatch
 import typing
@@ -249,9 +250,14 @@ def get_lineage(id: str):
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
     
-    # get lineage graph
-    lineage = {}
+    try:
+        config = load_config_for_artifact(artifact)
+    except LineageComputationError:
+        return jsonify({
+            "error": "The lineage graph cannot be computed because the artifact metadata is missing or malformed."
+        }), 400
 
+    lineage = build_lineage_graph(registry, str(id), artifact, config)
     return jsonify(lineage), 200
 
 
