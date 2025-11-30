@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
-from utils.lineage_utils import load_config_for_artifact, build_lineage_graph, LineageComputationError
+from utils.lineage_utils import build_lineage_graph
 import re
 import fnmatch
 import typing
@@ -243,21 +243,36 @@ def get_lineage(id: str):
     '''
     if not id:
         return jsonify({"error": "Missing field"}), 400
-    
+
     registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
-    artifact = registry.get(id)
+
+    artifact = registry.get(id) if isinstance(registry, dict) else None
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
-    
-    try:
-        config = load_config_for_artifact(artifact)
-    except LineageComputationError:
-        return jsonify({
-            "error": "The lineage graph cannot be computed because the artifact metadata is missing or malformed."
-        }), 400
 
-    lineage = build_lineage_graph(registry, str(id), artifact, config)
+    lineage = build_lineage_graph(registry, str(id), artifact)
+
+    if not isinstance(lineage, dict) or "nodes" not in lineage or "edges" not in lineage:
+        meta = artifact.get("metadata") or {}
+        data = artifact.get("data") or {}
+
+        root_node = {
+            "artifact_id": str(meta.get("id") or id),
+            "name": str(meta.get("name") or ""),
+            "version": str(meta.get("version") or ""),
+            "source": "metadata",
+        }
+
+        url = data.get("url")
+        if isinstance(url, str) and url:
+            root_node["metadata"] = {"repository_url": url}
+
+        lineage = {
+            "nodes": [root_node],
+            "edges": [],
+        }
+
     return jsonify(lineage), 200
 
 

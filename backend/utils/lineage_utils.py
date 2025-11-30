@@ -1,47 +1,49 @@
-from typing import Any, Dict, Iterable, List, Tuple, Set
+from typing import Any, Dict, Iterable, List, Tuple, Set, Optional
 import json
 from urllib.parse import urlparse
 from huggingface_hub import HfApi
 from utils.registry_utils import HF_HOSTS
 
-class LineageComputationError(Exception):
-    pass
-
 def _hf_repo_id_from_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.netloc not in HF_HOSTS:
-        raise LineageComputationError("Artifact is not hosted on HuggingFace.")
+        return None
 
     parts = [p for p in parsed.path.strip("/").split("/") if p]
     if len(parts) < 2:
-        raise LineageComputationError("Could not determine HuggingFace repo_id from URL.")
+        return None
 
     return f"{parts[0]}/{parts[1]}"
 
 def load_config_for_artifact(artifact: Dict[str, Any]) -> Dict[str, Any]:
     data = artifact.get("data") or {}
     url = data.get("url")
+
     if not isinstance(url, str) or not url:
-        raise LineageComputationError("Artifact is missing data.url")
+        return None
+
+    if HfApi is None:
+        # huggingface_hub not available in environment
+        return None
 
     repo_id = _hf_repo_id_from_url(url)
+    if not repo_id:
+        return None
 
     try:
         api = HfApi()
         cfg_path = api.hf_hub_download(repo_id=repo_id, filename="config.json")
-    except Exception as e:
-        raise LineageComputationError(f"Could not download config.json for {repo_id}") from e
+    except Exception:
+        # Could not download config.json
+        return None
 
     try:
         with open(cfg_path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
-    except Exception as e:
-        raise LineageComputationError("Malformed or unreadable config.json") from e
+    except Exception:
+        return None
 
-    if not isinstance(cfg, dict):
-        raise LineageComputationError("config.json is not a JSON object")
-
-    return cfg
+    return cfg if isinstance(cfg, dict) else None
 
 def _collect_strings(obj: Any) -> Set[str]:
     found: Set[str] = set()
@@ -69,7 +71,6 @@ def iter_registry_items(registry: Any) -> Iterable[Tuple[str, Dict[str, Any]]]:
                 yield str(aid), artifact
         return
 
-    # Fallback for list-style registries (older formats)
     for artifact in registry or []:
         if not isinstance(artifact, dict):
             continue
@@ -83,28 +84,28 @@ def build_lineage_graph(
     registry: Any,
     root_id: str,
     root_artifact: Dict[str, Any],
-    config: Dict[str, Any],
     ) -> Dict[str, Any]:
+
+    config = load_config_for_artifact(root_artifact)
+    config_strings = _collect_strings(config) if isinstance(config, dict) else set()
 
     nodes: Dict[str, Dict[str, Any]] = {}
     edges: List[Dict[str, Any]] = []
-    def add_node_for_artifact(artifact_id: str, artifact: Dict[str, Any]) -> None:
+
+    def add_node_for_artifact(artifact_id: str, artifact: Dict[str, Any], source: str) -> None:
         meta = artifact.get("metadata") or {}
         data = artifact.get("data") or {}
 
         node_id = str(meta.get("id") or artifact_id)
         name = str(meta.get("name") or "")
+        version = str(meta.get("version") or "")
 
         node: Dict[str, Any] = {
-            "node": node_id,
             "artifact_id": node_id,
             "name": name,
-            "source": "config_json",
+            "version": version,
+            "source": source if config_strings else "metadata",
         }
-
-        version = meta.get("version")
-        if version is not None:
-            node["version"] = str(version)
 
         lineage_meta: Dict[str, Any] = {}
         url = data.get("url")
@@ -115,9 +116,15 @@ def build_lineage_graph(
             node["metadata"] = lineage_meta
 
         nodes[str(artifact_id)] = node
-    
-    add_node_for_artifact(root_id, root_artifact)
-    config_strings = _collect_strings(config)
+
+    add_node_for_artifact(root_id, root_artifact, source="config_json")
+
+    if not config_strings:
+        return {
+            "nodes": list(nodes.values()),
+            "edges": edges,
+        }
+
     for candidate_id, candidate in iter_registry_items(registry):
         if candidate_id == root_id:
             continue
@@ -128,26 +135,24 @@ def build_lineage_graph(
             continue
 
         name_norm = name.strip().lower()
-        if not name_norm:
+        if name_norm not in config_strings:
             continue
 
-        if name_norm in config_strings:
-            if candidate_id not in nodes:
-                add_node_for_artifact(candidate_id, candidate)
+        if candidate_id not in nodes:
+            cand_type = str(meta.get("type") or "").lower()
+            source = "upstream_dataset" if cand_type == "dataset" else "config_json"
+            add_node_for_artifact(candidate_id, candidate, source=source)
 
-            candidate_type = str(meta.get("type") or "").lower()
-            if candidate_type == "dataset":
-                relationship = "fine_tuning_dataset"
-            else:
-                relationship = "base_model"
+        cand_type = str(meta.get("type") or "").lower()
+        relationship = "fine_tuning_dataset" if cand_type == "dataset" else "base_model"
 
-            edges.append(
-                {
-                    "from_node_artifact_id": candidate_id,  # upstream
-                    "to_node_artifact_id": root_id,        # this model
-                    "relationship": relationship,
-                }
-            )
+        edges.append(
+            {
+                "from_node_artifact_id": candidate_id,
+                "to_node_artifact_id": root_id,
+                "relationship": relationship,
+            }
+        )
 
     return {
         "nodes": list(nodes.values()),
