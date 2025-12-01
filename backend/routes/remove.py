@@ -21,7 +21,7 @@ def reset_registry():
    
     return jsonify({"message": "Registry has been reset"}), 200
 
-@remove_bp.route("/artifacts/<artifact_id>/<id>", methods=["DELETE"])
+@remove_bp.route("/artifacts/<artifact_type>/<id>", methods=["DELETE"])
 def delete_artifact(artifact_type: str, id: str):
     '''
     Delete an artifact given an id that matches 
