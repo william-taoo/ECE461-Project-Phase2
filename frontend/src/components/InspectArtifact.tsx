@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Modal, Button } from "react-bootstrap";
+import Download from "./Download";
 
 interface InspectArtifactModalProps {
     show: boolean;
@@ -61,6 +62,7 @@ const InspectArtifactModal: React.FC<InspectArtifactModalProps> = ({ show, onClo
                 <Button variant="primary" onClick={handleUpdate}>
                     Update URL
                 </Button>
+                <Download modelID={artifact.metadata.id} />
             </Modal.Footer>
         </Modal>
     );
