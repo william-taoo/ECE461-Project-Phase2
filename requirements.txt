@@ -18,3 +18,8 @@ networkx
 matplotlib
 jwt
 aiohttp
+async_timeout
+attrs
+charset-normalizer
+multidict
+yarl
