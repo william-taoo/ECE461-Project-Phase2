@@ -3,6 +3,7 @@ import os
 from urllib.parse import urlparse
 from pathlib import Path
 from datetime import datetime, timezone
+import boto3
 
 HF_HOSTS = {"huggingface.co", "hf.co"}
 CODE_HOSTS = {
@@ -15,6 +16,11 @@ MODEL_EXTS = (
 )
 AUDIT_ACTIONS = ["CREATE", "UPDATE", "DOWNLOAD", "RATE", "AUDIT"]
 AUDIT_DIR = Path("audit_logs")
+
+s3 = boto3.client("s3")
+
+BUCKET_NAME = "461-phase2-team12"
+KEY = "registry.json"
 
 def audit_path(artifact_id: str):
     path = AUDIT_DIR
@@ -116,15 +122,17 @@ def _as_dict(data):
         return out
     return {}
 
-def load_registry(path: str):
-    if not os.path.exists(path):
-        return {}
-    with open(path, "r") as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            return {}
-
+def load_registry():
+    """
+    Load the registry from AWS S3
+    """
+    try:
+        response = s3.get_object(Bucket=BUCKET_NAME, Key=KEY)
+        content = response["Body"].read().decode("utf-8")
+        return json.loads(content)
+    except Exception as e:
+        raise e
+    
 def iter_registry(registry):
     if isinstance(registry, dict):
         for aid, item in registry.items():
@@ -134,14 +142,17 @@ def iter_registry(registry):
             aid = str(item.get("metadata", {}).get("id") or item.get("id") or "")
             yield aid, item
 
-def save_registry(path: str, data):
-    dirpath = os.path.dirname(os.path.abspath(path))
-    if dirpath and not os.path.exists(dirpath):
-        os.makedirs(dirpath, exist_ok=True)
-
+def save_registry(data):
+    """
+    Save the registry to AWS S3
+    """
     data = _as_dict(data)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=4)
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=KEY,
+        Body=json.dumps(data, indent=4),
+        ContentType="application/json"
+    )
 
 def find_model_in_registry(registry, model_id: str):
     if isinstance(registry, dict):

@@ -9,8 +9,7 @@ put_bp = Blueprint("put", __name__)
 @put_bp.route("/artifacts/<artifact_type>/<id>", methods=["PUT"])
 def update_artifact(artifact_type: str, id: str):
     # Access to config for registry path
-    registry_path = current_app.config["REGISTRY_PATH"]
-    registry = load_registry(registry_path)
+    registry = load_registry()
     
     data = request.get_json()
     if not data:
@@ -30,7 +29,7 @@ def update_artifact(artifact_type: str, id: str):
 
     # Replace the artifact contents
     registry[id]["data"] = data
-    save_registry(registry_path, registry)
+    save_registry(registry)
 
     # Add to audit
     name = "Name" # Change this later

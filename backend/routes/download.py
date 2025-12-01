@@ -18,8 +18,7 @@ def download_model(model_id):
     - Sub aspects: weights, associated datasets, etc.
     We will get a component param, specifying what to download
     '''
-    registry_path = current_app.config["REGISTRY_PATH"]
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     # Check if model is in registry
     model = find_model_in_registry(registry, model_id)

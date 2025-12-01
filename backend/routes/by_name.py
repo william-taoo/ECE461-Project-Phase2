@@ -10,8 +10,7 @@ def artifact_by_name(name: str):
     if not clean:
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
-    reg_path = current_app.config["REGISTRY_PATH"]
-    registry = load_registry(reg_path) or {}
+    registry = load_registry() or {}
 
     out = []
     for aid, item in iter_registry(registry):

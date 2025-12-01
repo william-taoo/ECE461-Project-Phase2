@@ -16,8 +16,7 @@ def reset_registry():
         return jsonify({"error": "Permission denied"}), 401
 
     default = {} # Can change to whatever default
-    registry_path = current_app.config["REGISTRY_PATH"]
-    save_registry(registry_path, default)
+    save_registry(default)
    
     return jsonify({"message": "Registry has been reset"}), 200
 
@@ -32,8 +31,7 @@ def delete_artifact(artifact_type: str, id: str):
     if artifact_type not in ("model", "dataset", "code"):
         return jsonify({"error": "Invalid artifact_type"}), 400
 
-    registry_path = current_app.config["REGISTRY_PATH"]
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     artifact = registry.get(id)
     if not artifact:
@@ -44,6 +42,6 @@ def delete_artifact(artifact_type: str, id: str):
         return jsonify({"error": "Invalid artifact type"}), 400
 
     del registry[id]
-    save_registry(registry_path, registry)
+    save_registry(registry)
 
     return jsonify({"message": "Artifact has been deleted"}), 200

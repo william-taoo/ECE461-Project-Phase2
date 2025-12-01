@@ -44,11 +44,7 @@ def rate_model(id):
     if DatasetClass is None:
         return jsonify({"error": "Model implementation unavailable"}), 500
 
-    registry_path = current_app.config.get("REGISTRY_PATH")
-    if not registry_path:
-        return jsonify({"error": "Server misconfigured: REGISTRY_PATH unset"}), 500
-
-    registry = load_registry(registry_path)
+    registry = load_registry()
     entry = find_model_in_registry(registry, id) or registry.get(id)
     if not entry:
         return jsonify({"error": "Artifact does not exist."}), 404
@@ -124,7 +120,7 @@ def rate_model(id):
 
     entry["rating"] = response
     registry[id] = entry
-    save_registry(registry_path, registry)
+    save_registry(registry)
 
     # # Add to audit
     # name = "Name" # Change this later

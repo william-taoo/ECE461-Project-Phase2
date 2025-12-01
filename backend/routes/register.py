@@ -21,8 +21,7 @@ def register_artifact(artifact_type: str):
     if artifact_type not in ("model", "dataset", "code"):
         return jsonify({"error": "invalid artifact_type"}), 400
 
-    registry_path = current_app.config["REGISTRY_PATH"]
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     body = request.get_json(silent=True) or {}
     url = (body.get("url") or "").strip()
@@ -63,7 +62,7 @@ def register_artifact(artifact_type: str):
     else:
         registry.append(entry)
 
-    save_registry(registry_path, registry)
+    save_registry(registry)
 
     # Rate the artifact
     if artifact_type == "model":
@@ -73,7 +72,7 @@ def register_artifact(artifact_type: str):
             response = requests.get(rate_url)
             if response.status_code != 200:
                 del registry[artifact_id]
-                save_registry(registry_path, registry)
+                save_registry(registry)
                 return jsonify({"error": f"Failed to rate model: {response.text}"}), 424
             
             rating = response.json()
@@ -84,7 +83,7 @@ def register_artifact(artifact_type: str):
             if net_score < -1:
                 # Reject artifact
                 del registry[artifact_id]
-                save_registry(registry_path, registry)
+                save_registry(registry)
                 return jsonify({"error": f"Model rejected. Score too low: ({net_score}). Upload failed."}), 424
             
             # Save rating in artifact entry
@@ -103,10 +102,10 @@ def register_artifact(artifact_type: str):
                 registry[artifact_id] = final_entry
             else:
                 registry.append(final_entry)
-            save_registry(registry_path, registry)
+            save_registry(registry)
         except Exception as e:
             del registry[artifact_id]
-            save_registry(registry_path, registry)
+            save_registry(registry)
             return jsonify({"error": f"Failed to rate model: {e}"}), 424
     
     # # Add to audit

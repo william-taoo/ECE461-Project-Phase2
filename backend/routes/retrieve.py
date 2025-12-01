@@ -34,9 +34,7 @@ def get_artifacts():
     given a name and type
     """
     # get path to registry
-    registry_path = current_app.config.get("REGISTRY_PATH")
-    assert registry_path is not None
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     # parse JSON safely (handle single element list) 
     query = request.get_json(force=True, silent=True)
@@ -107,9 +105,7 @@ def get_name(name: str):
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
     # get path to registry
-    registry_path = current_app.config.get("REGISTRY_PATH")
-    assert registry_path is not None
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     results = []
     query = name.strip().lower()
@@ -135,9 +131,7 @@ def get_artifact(artifact_type: str, id: str):
     but ensure it includes id/name/type/version/metadata via serialization.
     """
     # get path to registry
-    registry_path = current_app.config.get("REGISTRY_PATH")
-    assert registry_path is not None
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     # get artifact by id
     artifact = registry.get(id)
@@ -173,9 +167,7 @@ def get_cost(artifact_type: str, id: str):
         return jsonify({"error": "Missing field(s)"}), 400
 
     # get path to registry
-    registry_path = current_app.config.get("REGISTRY_PATH")
-    assert registry_path is not None
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     # get artifact
     artifact = registry.get(id)
@@ -215,9 +207,7 @@ def get_audit(artifact_type: str, id: str):
     if not artifact_type or not id:
         return jsonify({"error": "Missing field(s)"}), 400
     
-    
-    registry_path = current_app.config["REGISTRY_PATH"]
-    registry = load_registry(registry_path)
+    registry = load_registry()
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
@@ -244,8 +234,7 @@ def get_lineage(id: str):
     if not id:
         return jsonify({"error": "Missing field"}), 400
 
-    registry_path = current_app.config["REGISTRY_PATH"]
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     artifact = registry.get(id) if isinstance(registry, dict) else None
     if not artifact:
@@ -317,9 +306,7 @@ def get_by_regex():
     except re.error:
         return jsonify({"error": "Invalid regular expression"}), 400
 
-    registry_path = current_app.config.get("REGISTRY_PATH")
-    assert registry_path is not None
-    registry = load_registry(registry_path)
+    registry = load_registry()
 
     matches = []
     for artifact_id, artifact in registry.items():

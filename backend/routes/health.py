@@ -17,6 +17,8 @@ def health_check_components():
       - windowMinutes: length of trailing window
       - includeTimeline: default False
     '''
+
+    # FIX SO THAT IT ACCESSES REGISTRY ON S3, NOT LOCAL
     registry_path = current_app.config["REGISTRY_PATH"]
 
     try:
