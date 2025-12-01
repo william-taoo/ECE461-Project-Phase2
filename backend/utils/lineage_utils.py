@@ -70,26 +70,20 @@ def load_config_for_artifact(artifact: Dict[str, Any]) -> Dict[str, Any]:
 
     data = artifact.get("data") or {}
     url = data.get("url")
-    if not isinstance(url, str) or not url:
-        return None
+    if isinstance(url, str) and url:
+        repo_id = _hf_repo_id_from_url(url)
+        if repo_id and HfApi is not None:
+            try:
+                api = HfApi()
+                cfg_path = api.hf_hub_download(repo_id=repo_id, filename="config.json")
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                if isinstance(cfg, dict):
+                    return cfg
+            except Exception:
+                pass
 
-    repo_id = _hf_repo_id_from_url(url)
-    if not repo_id:
-        return None
-
-    try:
-        api = HfApi()
-        cfg_path = api.hf_hub_download(repo_id=repo_id, filename="config.json")
-    except Exception:
-        return None
-
-    try:
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            cfg = json.load(f)
-    except Exception:
-        return None
-
-    return cfg if isinstance(cfg, dict) else None
+    return metadata if isinstance(metadata, dict) and metadata else None
 
 def _collect_strings(obj: Any) -> Set[str]:
     found: Set[str] = set()
@@ -132,104 +126,120 @@ def build_lineage_graph(
     root_artifact: Dict[str, Any],
     ) -> Dict[str, Any]:
 
-    id_to_artifact: Dict[str, Dict[str, Any]] = {
-        aid: art for aid, art in iter_registry_items(registry)
-    }
+    id_to_model: Dict[str, Dict[str, Any]] = {}
+    for aid, art in iter_registry_items(registry):
+        meta = art.get("metadata") or {}
+        if str(meta.get("type") or "").lower() == "model":
+            id_to_model[aid] = art
 
-    nodes: Dict[str, Dict[str, Any]] = {}
+    # Ensure the root is present, even if registry/indexing missed it
+    root_meta = root_artifact.get("metadata") or {}
+    if str(root_meta.get("type") or "").lower() == "model":
+        id_to_model[root_id] = root_artifact
+
+    # 2) Precompute candidate tokens (name & id) for all models
+    candidate_tokens: Dict[str, Tuple[str, str]] = {}
+    for cand_id, cand in id_to_model.items():
+        meta = cand.get("metadata") or {}
+        nm = meta.get("name")
+        name_norm = nm.strip().lower() if isinstance(nm, str) else ""
+        cid_norm = str(meta.get("id") or cand_id).strip().lower()
+        candidate_tokens[cand_id] = (name_norm, cid_norm)
+
+    # 3) For each model, load its config/metadata and infer base_model edges
+    has_config: Dict[str, bool] = {}
     edges: List[Dict[str, Any]] = []
+    edge_set: Set[Tuple[str, str, str]] = set()
 
-    def add_node_for_artifact(artifact_id: str, artifact: Dict[str, Any], source: str) -> None:
-        meta = artifact.get("metadata") or {}
-        data = artifact.get("data") or {}
-
-        node_id = str(meta.get("id") or artifact_id)
-        name = str(meta.get("name") or "")
-        version = str(meta.get("version") or "")
-
-        node: Dict[str, Any] = {
-            "artifact_id": node_id,
-            "name": name,
-            "version": version,
-            "source": source,
-        }
-
-        lineage_meta: Dict[str, Any] = {}
-        url = data.get("url")
-        if isinstance(url, str) and url:
-            lineage_meta["repository_url"] = url
-
-        if lineage_meta:
-            node["metadata"] = lineage_meta
-
-        if artifact_id in nodes:
-            existing = nodes[artifact_id]
-            for k, v in node.items():
-                if k not in existing or existing[k] in (None, "", {}):
-                    existing[k] = v
-        else:
-            nodes[artifact_id] = node
-
-    visited: Set[str] = set()
-    queue: List[str] = [root_id]
-
-    while queue:
-        current_id = queue.pop(0)
-        if current_id in visited:
-            continue
-        visited.add(current_id)
-
-        if current_id == root_id:
-            artifact = root_artifact
-        else:
-            artifact = id_to_artifact.get(current_id)
-            if artifact is None:
-                continue
-
-        cfg = load_config_for_artifact(artifact)
+    for cur_id, cur_art in id_to_model.items():
+        cfg = load_config_for_artifact(cur_art)
         cfg_strings = _collect_strings(cfg) if isinstance(cfg, dict) else set()
-
-        source = "config_json" if cfg_strings else "metadata"
-        add_node_for_artifact(current_id, artifact, source=source)
+        has_config[cur_id] = bool(cfg_strings)
 
         if not cfg_strings:
             continue
 
-        for candidate_id, candidate in id_to_artifact.items():
-            if candidate_id == current_id:
+        for cand_id, (cand_name, cid_norm) in candidate_tokens.items():
+            if cand_id == cur_id:
                 continue
-
-            meta = candidate.get("metadata") or {}
-            cand_type = str(meta.get("type") or "").lower()
-            if cand_type != "model":
-                continue
-
-            name = meta.get("name")
-            cand_name = name.strip().lower() if isinstance(name, str) else ""
-
-            cid = str(meta.get("id") or candidate_id).strip().lower()
 
             def matches_token(token: str) -> bool:
-                return any(token in s or s in token for s in cfg_strings)
+                return bool(token) and any(token in s or s in token for s in cfg_strings)
 
-            if (cand_name and matches_token(cand_name)) or (cid and matches_token(cid)):
-                add_node_for_artifact(candidate_id, candidate, source="config_json")
-
+            if matches_token(cand_name) or matches_token(cid_norm):
+                edge_key = (cand_id, cur_id, "base_model")
+                if edge_key in edge_set:
+                    continue
+                edge_set.add(edge_key)
                 edges.append(
                     {
-                        "from_node_artifact_id": candidate_id,
-                        "to_node_artifact_id": current_id,
+                        "from_node_artifact_id": cand_id,  # upstream base model
+                        "to_node_artifact_id": cur_id,     # downstream model
                         "relationship": "base_model",
                     }
                 )
+                
+    neighbors: Dict[str, Set[str]] = {mid: set() for mid in id_to_model.keys()}
+    for e in edges:
+        u = str(e["from_node_artifact_id"])
+        v = str(e["to_node_artifact_id"])
+        neighbors.setdefault(u, set()).add(v)
+        neighbors.setdefault(v, set()).add(u)
 
-                if candidate_id not in visited:
-                    queue.append(candidate_id)
+    component: Set[str] = set()
+    if root_id in id_to_model:
+        queue: List[str] = [root_id]
+        while queue:
+            nid = queue.pop(0)
+            if nid in component:
+                continue
+            component.add(nid)
+            for nbr in neighbors.get(nid, []):
+                if nbr not in component:
+                    queue.append(nbr)
+    else:
+        component = {root_id}
+        id_to_model[root_id] = root_artifact
+        has_config[root_id] = bool(
+            _collect_strings(load_config_for_artifact(root_artifact) or {})
+        )
 
-    if root_id not in nodes:
-        add_node_for_artifact(root_id, root_artifact, source="metadata")
+    nodes: List[Dict[str, Any]] = []
+    for nid in component:
+        art = id_to_model.get(nid, root_artifact if nid == root_id else None)
+        if not art:
+            continue
+
+        meta = art.get("metadata") or {}
+        data = art.get("data") or {}
+
+        node_id = meta.get("id", nid)
+        name = meta.get("name") or ""
+        version = str(meta.get("version") or "")
+        source = "config_json" if has_config.get(nid) else "metadata"
+
+        node: Dict[str, Any] = {
+            "node": node_id,
+            "artifact_id": node_id,
+            "name": str(name),
+            "version": version,
+            "source": source,
+        }
+
+        url = data.get("url")
+        if isinstance(url, str) and url:
+            node["metadata"] = {"repository_url": url}
+
+        nodes.append(node)
+
+    comp_ids = {nid for nid in component}
+    filtered_edges = [
+        e for e in edges
+        if str(e["from_node_artifact_id"]) in comp_ids
+        and str(e["to_node_artifact_id"]) in comp_ids
+    ]
 
     return {
-        "nodes": list(nodes.values()),
-        "edges": edges,
+        "nodes": nodes,
+        "edges": filtered_edges,
     }
