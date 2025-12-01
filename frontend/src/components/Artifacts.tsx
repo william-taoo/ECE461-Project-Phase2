@@ -27,7 +27,9 @@ const Artifacts: React.FC = () => {
     const [queryArtifacts, setQueryArtifacts] = useState<Artifact[]>([]);
     const [searchByNameArtifacts, setSearchByNameArtifacts] = useState<MetaData[]>([]);
     const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
-    const [showInspectModal, setShowInspectModal] = useState(false);
+    const [showInspectModal, setShowInspectModal] = useState<boolean>(false);
+    const [isSearchByQuery, setIsSearchByQuery] = useState<boolean>(false);
+    const [isSearchByName, setIsSearchByName] = useState<boolean>(false);
 
     const inspectArtifact = async (id: string, type: string) => {
         try {
@@ -48,11 +50,25 @@ const Artifacts: React.FC = () => {
             
             <div className="flex flex-row items-center justify-center gap-3 mb-4">
                 <Upload />
-                <SearchByQuery result={(data) => setQueryArtifacts(data)} />
-                <ModelByName onResults={(items) => setSearchByNameArtifacts(items)} />
+                <SearchByQuery 
+                    result={(data) => {
+                        setQueryArtifacts(data);
+                        setSearchByNameArtifacts([]);
+                        setIsSearchByQuery(true);
+                        setIsSearchByName(false);
+                    }}
+                />
+                <ModelByName 
+                    onResults={(items) => {
+                        setSearchByNameArtifacts(items);
+                        setQueryArtifacts([]);
+                        setIsSearchByQuery(false);
+                        setIsSearchByName(true);
+                    }}
+                />
             </div>
 
-            {searchByNameArtifacts.length > 0 && (
+            {isSearchByName && searchByNameArtifacts.length > 0 && (
                 <div className="mb-6">
                     <h3 className="text-lg font-semibold mb-2">Search Results (by name)</h3>
                     <div className="max-h-[20rem] overflow-y-auto pr-2">
@@ -71,8 +87,9 @@ const Artifacts: React.FC = () => {
                 </div>
             )}
 
-            {queryArtifacts.length > 0 ? (
+            {isSearchByQuery && queryArtifacts.length > 0 && (
                 <div className="max-h-[32rem] overflow-y-auto pr-2">
+                    <h3 className="text-lg font-semibold mb-2">Search Results (by query)</h3>
                     <ul className="space-y-3">
                         {queryArtifacts.map((a) => (
                             <li
@@ -85,8 +102,10 @@ const Artifacts: React.FC = () => {
                         ))}
                     </ul>
                 </div>
-            ) : (
-                <p className="text-white text-sm text-center">No artifacts registered yet.</p>
+            )}
+
+            {!isSearchByQuery && !isSearchByName && (
+                <p className="text-gray-300 text-center">No artifacts to display. Please use the search options above.</p>
             )}
 
             <InspectArtifactModal
