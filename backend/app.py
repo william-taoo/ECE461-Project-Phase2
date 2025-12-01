@@ -11,6 +11,7 @@ from routes.remove import remove_bp
 from routes.health import health_bp
 from routes.by_name import by_name_bp
 from routes.put import put_bp
+from routes.performance import performance_bp
 
 # paths
 BASE_DIR = os.path.dirname(__file__)
@@ -61,6 +62,7 @@ app.register_blueprint(remove_bp)
 app.register_blueprint(health_bp)
 app.register_blueprint(by_name_bp)
 app.register_blueprint(put_bp)
+app.register_blueprint(performance_bp)
 
 
 # logging before request
