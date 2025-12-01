@@ -124,15 +124,34 @@ def _as_dict(data):
 
 def load_registry():
     """
-    Load the registry from AWS S3
+    Load the registry from S3. If it doesn't exist, return an empty dict.
     """
     try:
         response = s3.get_object(Bucket=BUCKET_NAME, Key=KEY)
         content = response["Body"].read().decode("utf-8")
-        return json.loads(content)
+        return _as_dict(json.loads(content))
+    except s3.exceptions.NoSuchKey:
+        # Registry file doesn't exist yet
+        return {}
     except Exception as e:
-        raise e
-    
+        raise RuntimeError(f"Failed to load registry from S3: {e}") from e
+
+
+def save_registry(data):
+    """
+    Save the registry to S3.
+    """
+    data = _as_dict(data)
+    try:
+        s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key=KEY,
+            Body=json.dumps(data, indent=4),
+            ContentType="application/json"
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to save registry to S3: {e}") from e
+
 def iter_registry(registry):
     if isinstance(registry, dict):
         for aid, item in registry.items():
@@ -141,18 +160,6 @@ def iter_registry(registry):
         for item in registry:
             aid = str(item.get("metadata", {}).get("id") or item.get("id") or "")
             yield aid, item
-
-def save_registry(data):
-    """
-    Save the registry to AWS S3
-    """
-    data = _as_dict(data)
-    s3.put_object(
-        Bucket=BUCKET_NAME,
-        Key=KEY,
-        Body=json.dumps(data, indent=4),
-        ContentType="application/json"
-    )
 
 def find_model_in_registry(registry, model_id: str):
     if isinstance(registry, dict):
