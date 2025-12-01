@@ -93,10 +93,6 @@ def _collect_strings(obj: Any) -> Set[str]:
             s = node.strip().lower()
             if s:
                 found.add(s)
-        elif isinstance(node, (int, float, bool)):
-            s = str(node).strip().lower()
-            if s:
-                found.add(s)
         elif isinstance(node, dict):
             for k, v in node.items():
                 walk(k)
@@ -130,56 +126,20 @@ def build_lineage_graph(
     root_artifact: Dict[str, Any],
     ) -> Dict[str, Any]:
 
-    model_id_to_artifact: Dict[str, Dict[str, Any]] = {}
-    for aid, artifact in iter_registry_items(registry):
-        if not isinstance(artifact, dict):
-            continue
-        meta = artifact.get("metadata") or {}
-        a_type = str(meta.get("type") or "").lower()
-        if a_type != "model":
-            continue
-        model_id_to_artifact[str(aid)] = artifact
+    id_to_artifact: Dict[str, Dict[str, Any]] = {
+        aid: art for aid, art in iter_registry_items(registry)
+    }
 
-    # Ensure root is included even if type is odd/missing
-    if root_id not in model_id_to_artifact and isinstance(root_artifact, dict):
-        model_id_to_artifact[str(root_id)] = root_artifact
-
-    if not model_id_to_artifact:
-        # No models at all; just return a trivial graph with the root.
-        meta = root_artifact.get("metadata") or {}
-        data = root_artifact.get("data") or {}
-        root_node: Dict[str, Any] = {
-            "artifact_id": str(meta.get("id") or root_id),
-            "name": str(meta.get("name") or ""),
-            "source": "metadata",
-        }
-        url = data.get("url")
-        if isinstance(url, str) and url:
-            root_node["metadata"] = {"repository_url": url}
-        return {"nodes": [root_node], "edges": []}
-
-    # ---- 2) Precompute config string sets for each model ----
-    cfg_strings_map: Dict[str, Set[str]] = {}
-    for mid, art in model_id_to_artifact.items():
-        cfg = load_config_for_artifact(art)
-        cfg_strings_map[mid] = _collect_strings(cfg) if isinstance(cfg, dict) else set()
-
-    # ---- 3) Build nodes + edges globally ----
     nodes: Dict[str, Dict[str, Any]] = {}
     edges: List[Dict[str, Any]] = []
-    adjacency: Dict[str, Set[str]] = {mid: set() for mid in model_id_to_artifact}
-    seen_edges: Set[Tuple[str, str]] = set()
 
-    def add_node(mid: str, art: Dict[str, Any], source_hint: Optional[str] = None) -> None:
-        meta = art.get("metadata") or {}
-        data = art.get("data") or {}
+    def add_node_for_artifact(artifact_id: str, artifact: Dict[str, Any], source: str) -> None:
+        meta = artifact.get("metadata") or {}
+        data = artifact.get("data") or {}
 
-        node_id = str(meta.get("id") or mid)
+        node_id = str(meta.get("id") or artifact_id)
         name = str(meta.get("name") or "")
         version = str(meta.get("version") or "")
-
-        # Prefer config_json if we actually have config-derived strings
-        source = source_hint or ("config_json" if cfg_strings_map.get(mid) else "metadata")
 
         node: Dict[str, Any] = {
             "artifact_id": node_id,
@@ -196,55 +156,67 @@ def build_lineage_graph(
         if lineage_meta:
             node["metadata"] = lineage_meta
 
-        if mid in nodes:
-            existing = nodes[mid]
-            # Fill in any missing fields from the new node
+        if artifact_id in nodes:
+            existing = nodes[artifact_id]
             for k, v in node.items():
                 if k not in existing or existing[k] in (None, "", {}):
                     existing[k] = v
         else:
-            nodes[mid] = node
+            nodes[artifact_id] = node
 
-    # For each model as CHILD, find possible PARENTS
-    for child_id, child_art in model_id_to_artifact.items():
-        cfg_strings = cfg_strings_map.get(child_id) or set()
+    visited: Set[str] = set()
+    queue: List[str] = [root_id]
 
-        cur_meta = child_art.get("metadata") or {}
-        cur_name_norm = str(cur_meta.get("name") or "").strip().lower()
+    while queue:
+        current_id = queue.pop(0)
+        if current_id in visited:
+            continue
+        visited.add(current_id)
 
-        # no strings => no lineage info for this child
+        if current_id == root_id:
+            artifact = root_artifact
+        else:
+            artifact = id_to_artifact.get(current_id)
+            if artifact is None:
+                continue
+
+        cfg = load_config_for_artifact(artifact)
+        cfg_strings = _collect_strings(cfg) if isinstance(cfg, dict) else set()
+
+        source = "config_json" if cfg_strings else "metadata"
+        add_node_for_artifact(current_id, artifact, source=source)
+
         if not cfg_strings:
             continue
 
+        meta_cur = artifact.get("metadata") or {}
+        cur_name_norm = str(meta_cur.get("name") or "").strip().lower()
+
         possible_parents: List[Tuple[int, str, Dict[str, Any]]] = []
 
-        for cand_id, cand_art in model_id_to_artifact.items():
-            if cand_id == child_id:
+        for candidate_id, candidate in id_to_artifact.items():
+            if candidate_id == current_id:
                 continue
 
-            cand_meta = cand_art.get("metadata") or {}
-            cand_name = cand_meta.get("name")
-            cand_name_norm = cand_name.strip().lower() if isinstance(cand_name, str) else ""
-            cand_id_norm = str(cand_meta.get("id") or cand_id).strip().lower()
+            meta = candidate.get("metadata") or {}
+            cand_type = str(meta.get("type") or "").lower()
 
-            def token_in_cfg(token: str) -> bool:
-                if not token:
-                    return False
-                for s in cfg_strings:
-                    if token in s or s in token:
-                        return True
-                return False
+            if cand_type != "model":
+                continue
 
-            name_matches = cand_name_norm and token_in_cfg(cand_name_norm)
-            id_matches = cand_id_norm and token_in_cfg(cand_id_norm)
+            name = meta.get("name")
+            cand_name_norm = name.strip().lower() if isinstance(name, str) else ""
+            cid_norm = str(meta.get("id") or candidate_id).strip().lower()
+
+            def matches_token(token: str) -> bool:
+                return bool(token) and any(token in s or s in token for s in cfg_strings)
+
+            name_matches = cand_name_norm and matches_token(cand_name_norm)
+            id_matches = cid_norm and matches_token(cid_norm)
 
             if not (name_matches or id_matches):
                 continue
 
-            # Heuristic scoring to prefer "obvious" parents:
-            # - name is substring of child's name: strongest
-            # - otherwise any name match
-            # - otherwise id match
             score = 0
             if cand_name_norm and cur_name_norm and cand_name_norm in cur_name_norm:
                 score = 3
@@ -253,67 +225,29 @@ def build_lineage_graph(
             elif id_matches:
                 score = 1
 
-            possible_parents.append((score, cand_id, cand_art))
+            possible_parents.append((score, candidate_id, candidate))
 
-        if not possible_parents:
-            continue
+        if possible_parents:
+            possible_parents.sort(key=lambda t: (-t[0], t[1]))
+            _, best_parent_id, best_parent_art = possible_parents[0]
 
-        # Sort parents by score desc, then id for determinism
-        possible_parents.sort(key=lambda t: (-t[0], t[1]))
-
-        # Include *all* matching parents (keeps tests happy if multiple)
-        for _, parent_id, parent_art in possible_parents:
-            edge_key = (parent_id, child_id)
-            if edge_key in seen_edges:
-                continue
-            seen_edges.add(edge_key)
-
-            add_node(child_id, child_art)
-            add_node(parent_id, parent_art)
+            add_node_for_artifact(best_parent_id, best_parent_art, source="config_json")
 
             edges.append(
                 {
-                    "from_node_artifact_id": parent_id,
-                    "to_node_artifact_id": child_id,
+                    "from_node_artifact_id": best_parent_id,
+                    "to_node_artifact_id": current_id,
                     "relationship": "base_model",
                 }
             )
-            adjacency[parent_id].add(child_id)
-            adjacency[child_id].add(parent_id)
 
-    # If we couldn't infer any relationships at all, fall back to a single-node graph.
-    if not edges:
-        add_node(root_id, root_artifact)
-        return {
-            "nodes": [nodes[root_id]],
-            "edges": [],
-        }
+            if best_parent_id not in visited:
+                queue.append(best_parent_id)
 
-    # ---- 4) Restrict to the connected component containing root_id ----
-    # Make sure root exists in maps
-    if root_id not in model_id_to_artifact:
-        model_id_to_artifact[root_id] = root_artifact
-    add_node(root_id, model_id_to_artifact[root_id])
-
-    visited: Set[str] = set()
-    queue: List[str] = [root_id]
-
-    while queue:
-        cur = queue.pop(0)
-        if cur in visited:
-            continue
-        visited.add(cur)
-        for nb in adjacency.get(cur, []):
-            if nb not in visited:
-                queue.append(nb)
-
-    final_nodes = [node for mid, node in nodes.items() if mid in visited]
-    final_edges = [
-        e for e in edges
-        if e["from_node_artifact_id"] in visited and e["to_node_artifact_id"] in visited
-    ]
+    if root_id not in nodes:
+        add_node_for_artifact(root_id, root_artifact, source="metadata")
 
     return {
-        "nodes": final_nodes,
-        "edges": final_edges,
+        "nodes": list(nodes.values()),
+        "edges": edges,
     }
