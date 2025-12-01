@@ -17,7 +17,7 @@ MODEL_EXTS = (
 AUDIT_ACTIONS = ["CREATE", "UPDATE", "DOWNLOAD", "RATE", "AUDIT"]
 AUDIT_DIR = Path("audit_logs")
 
-s3 = boto3.client("s3")
+s3 = boto3.client("s3", region_name="us-east-2")
 
 BUCKET_NAME = "461-phase2-team12"
 KEY = "registry.json"
