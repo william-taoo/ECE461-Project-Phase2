@@ -1,9 +1,12 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
+import React, { useState } from 'react';
 import Health from './components/Health';
 import Artifacts from './components/Artifacts';
 import Reset from './components/Reset';
+import ResultPanel from './components/ResultPanel';
 
 function App() {
+    const [result, setResult] = useState<{ type: string; data: any } | null>(null);
 
     return (
         <div className="min-h-screen flex flex-col items-center bg-gray-300 px-6 py-8">
@@ -21,7 +24,11 @@ function App() {
             {/* Health and Artifact Column Components */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-8">
                 <Health />
-                <Artifacts />
+                <Artifacts onResult={setResult} />
+            </div>
+                <ResultPanel result={result} />
+            <div>
+
             </div>
         </div>
     );

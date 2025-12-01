@@ -133,3 +133,5 @@ logging
 os
 
 log.txt
+
+/backend/audit_logs/

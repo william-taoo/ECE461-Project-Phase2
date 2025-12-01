@@ -21,9 +21,13 @@ interface Artifact {
     data: Data;
 }
 
+interface ArtifactProps {
+    onResult: (data: any) => void;
+}
+
 const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
 
-const Artifacts: React.FC = () => {
+const Artifacts: React.FC<ArtifactProps> = ({ onResult }) => {
     const [queryArtifacts, setQueryArtifacts] = useState<Artifact[]>([]);
     const [searchByNameArtifacts, setSearchByNameArtifacts] = useState<MetaData[]>([]);
     const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
@@ -112,6 +116,7 @@ const Artifacts: React.FC = () => {
                 show={showInspectModal}
                 onClose={() => setShowInspectModal(false)}
                 artifact={selectedArtifact}
+                onResult={onResult}
             />
         </div>
     )
