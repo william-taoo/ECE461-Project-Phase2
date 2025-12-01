@@ -132,8 +132,9 @@ def build_lineage_graph(
     root_artifact: Dict[str, Any],
     ) -> Dict[str, Any]:
 
-    config = load_config_for_artifact(root_artifact)
-    config_strings = _collect_strings(config) if isinstance(config, dict) else set()
+    id_to_artifact: Dict[str, Dict[str, Any]] = {
+        aid: art for aid, art in iter_registry_items(registry)
+    }
 
     nodes: Dict[str, Dict[str, Any]] = {}
     edges: List[Dict[str, Any]] = []
@@ -150,7 +151,7 @@ def build_lineage_graph(
             "artifact_id": node_id,
             "name": name,
             "version": version,
-            "source": source if config_strings else "metadata",
+            "source": source,
         }
 
         lineage_meta: Dict[str, Any] = {}
@@ -161,46 +162,72 @@ def build_lineage_graph(
         if lineage_meta:
             node["metadata"] = lineage_meta
 
-        nodes[str(artifact_id)] = node
+        if artifact_id in nodes:
+            existing = nodes[artifact_id]
+            for k, v in node.items():
+                if k not in existing or existing[k] in (None, "", {}):
+                    existing[k] = v
+        else:
+            nodes[artifact_id] = node
 
-    add_node_for_artifact(root_id, root_artifact, source="config_json")
+    visited: Set[str] = set()
+    queue: List[str] = [root_id]
 
-    if not config_strings:
-        return {
-            "nodes": list(nodes.values()),
-            "edges": edges,
-        }
+    while queue:
+        current_id = queue.pop(0)
+        if current_id in visited:
+            continue
+        visited.add(current_id)
 
-    for candidate_id, candidate in iter_registry_items(registry):
-        if candidate_id == root_id:
+        if current_id == root_id:
+            artifact = root_artifact
+        else:
+            artifact = id_to_artifact.get(current_id)
+            if artifact is None:
+                continue
+
+        cfg = load_config_for_artifact(artifact)
+        cfg_strings = _collect_strings(cfg) if isinstance(cfg, dict) else set()
+
+        source = "config_json" if cfg_strings else "metadata"
+        add_node_for_artifact(current_id, artifact, source=source)
+
+        if not cfg_strings:
             continue
 
-        meta = candidate.get("metadata") or {}
+        for candidate_id, candidate in id_to_artifact.items():
+            if candidate_id == current_id:
+                continue
 
-        name = meta.get("name")
-        name_norm = ""
-        if isinstance(name, str):
-            name_norm = name.strip().lower()
-
-        cid = str(meta.get("id") or candidate_id)
-        cid_norm = cid.strip().lower()
-
-        if (name_norm and name_norm in config_strings) or (cid_norm and cid_norm in config_strings):
-            if candidate_id not in nodes:
-                cand_type = str(meta.get("type") or "").lower()
-                source = "upstream_dataset" if cand_type == "dataset" else "config_json"
-                add_node_for_artifact(candidate_id, candidate, source=source)
-
+            meta = candidate.get("metadata") or {}
             cand_type = str(meta.get("type") or "").lower()
-            relationship = "fine_tuning_dataset" if cand_type == "dataset" else "base_model"
+            if cand_type != "model":
+                continue
 
-            edges.append(
-                {
-                    "from_node_artifact_id": candidate_id,
-                    "to_node_artifact_id": root_id,
-                    "relationship": relationship,
-                }
-            )
+            name = meta.get("name")
+            cand_name = name.strip().lower() if isinstance(name, str) else ""
+
+            cid = str(meta.get("id") or candidate_id).strip().lower()
+
+            def matches_token(token: str) -> bool:
+                return any(token in s or s in token for s in cfg_strings)
+
+            if (cand_name and matches_token(cand_name)) or (cid and matches_token(cid)):
+                add_node_for_artifact(candidate_id, candidate, source="config_json")
+
+                edges.append(
+                    {
+                        "from_node_artifact_id": candidate_id,
+                        "to_node_artifact_id": current_id,
+                        "relationship": "base_model",
+                    }
+                )
+
+                if candidate_id not in visited:
+                    queue.append(candidate_id)
+
+    if root_id not in nodes:
+        add_node_for_artifact(root_id, root_artifact, source="metadata")
 
     return {
         "nodes": list(nodes.values()),
