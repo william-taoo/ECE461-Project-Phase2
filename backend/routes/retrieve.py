@@ -260,7 +260,6 @@ def get_lineage(id: str):
         root_node = {
             "artifact_id": str(meta.get("id") or id),
             "name": str(meta.get("name") or ""),
-            "version": str(meta.get("version") or ""),
             "source": "metadata",
         }
 

@@ -126,120 +126,128 @@ def build_lineage_graph(
     root_artifact: Dict[str, Any],
     ) -> Dict[str, Any]:
 
-    id_to_model: Dict[str, Dict[str, Any]] = {}
-    for aid, art in iter_registry_items(registry):
-        meta = art.get("metadata") or {}
-        if str(meta.get("type") or "").lower() == "model":
-            id_to_model[aid] = art
+    id_to_artifact: Dict[str, Dict[str, Any]] = {
+        aid: art for aid, art in iter_registry_items(registry)
+    }
 
-    # Ensure the root is present, even if registry/indexing missed it
-    root_meta = root_artifact.get("metadata") or {}
-    if str(root_meta.get("type") or "").lower() == "model":
-        id_to_model[root_id] = root_artifact
-
-    # 2) Precompute candidate tokens (name & id) for all models
-    candidate_tokens: Dict[str, Tuple[str, str]] = {}
-    for cand_id, cand in id_to_model.items():
-        meta = cand.get("metadata") or {}
-        nm = meta.get("name")
-        name_norm = nm.strip().lower() if isinstance(nm, str) else ""
-        cid_norm = str(meta.get("id") or cand_id).strip().lower()
-        candidate_tokens[cand_id] = (name_norm, cid_norm)
-
-    # 3) For each model, load its config/metadata and infer base_model edges
-    has_config: Dict[str, bool] = {}
+    nodes: Dict[str, Dict[str, Any]] = {}
     edges: List[Dict[str, Any]] = []
-    edge_set: Set[Tuple[str, str, str]] = set()
 
-    for cur_id, cur_art in id_to_model.items():
-        cfg = load_config_for_artifact(cur_art)
-        cfg_strings = _collect_strings(cfg) if isinstance(cfg, dict) else set()
-        has_config[cur_id] = bool(cfg_strings)
+    def add_node_for_artifact(artifact_id: str, artifact: Dict[str, Any], source: str) -> None:
+        meta = artifact.get("metadata") or {}
+        data = artifact.get("data") or {}
 
-        if not cfg_strings:
-            continue
-
-        for cand_id, (cand_name, cid_norm) in candidate_tokens.items():
-            if cand_id == cur_id:
-                continue
-
-            def matches_token(token: str) -> bool:
-                return bool(token) and any(token in s or s in token for s in cfg_strings)
-
-            if matches_token(cand_name) or matches_token(cid_norm):
-                edge_key = (cand_id, cur_id, "base_model")
-                if edge_key in edge_set:
-                    continue
-                edge_set.add(edge_key)
-                edges.append(
-                    {
-                        "from_node_artifact_id": cand_id,  # upstream base model
-                        "to_node_artifact_id": cur_id,     # downstream model
-                        "relationship": "base_model",
-                    }
-                )
-                
-    neighbors: Dict[str, Set[str]] = {mid: set() for mid in id_to_model.keys()}
-    for e in edges:
-        u = str(e["from_node_artifact_id"])
-        v = str(e["to_node_artifact_id"])
-        neighbors.setdefault(u, set()).add(v)
-        neighbors.setdefault(v, set()).add(u)
-
-    component: Set[str] = set()
-    if root_id in id_to_model:
-        queue: List[str] = [root_id]
-        while queue:
-            nid = queue.pop(0)
-            if nid in component:
-                continue
-            component.add(nid)
-            for nbr in neighbors.get(nid, []):
-                if nbr not in component:
-                    queue.append(nbr)
-    else:
-        component = {root_id}
-        id_to_model[root_id] = root_artifact
-        has_config[root_id] = bool(
-            _collect_strings(load_config_for_artifact(root_artifact) or {})
-        )
-
-    nodes: List[Dict[str, Any]] = []
-    for nid in component:
-        art = id_to_model.get(nid, root_artifact if nid == root_id else None)
-        if not art:
-            continue
-
-        meta = art.get("metadata") or {}
-        data = art.get("data") or {}
-
-        node_id = meta.get("id", nid)
-        name = meta.get("name") or ""
+        node_id = str(meta.get("id") or artifact_id)
+        name = str(meta.get("name") or "")
         version = str(meta.get("version") or "")
-        source = "config_json" if has_config.get(nid) else "metadata"
 
         node: Dict[str, Any] = {
-            "node": node_id,
             "artifact_id": node_id,
-            "name": str(name),
+            "name": name,
             "version": version,
             "source": source,
         }
 
+        lineage_meta: Dict[str, Any] = {}
         url = data.get("url")
         if isinstance(url, str) and url:
-            node["metadata"] = {"repository_url": url}
+            lineage_meta["repository_url"] = url
 
-        nodes.append(node)
+        if lineage_meta:
+            node["metadata"] = lineage_meta
 
-    comp_ids = {nid for nid in component}
-    filtered_edges = [
-        e for e in edges
-        if str(e["from_node_artifact_id"]) in comp_ids
-        and str(e["to_node_artifact_id"]) in comp_ids
-    ]
+        if artifact_id in nodes:
+            existing = nodes[artifact_id]
+            for k, v in node.items():
+                if k not in existing or existing[k] in (None, "", {}):
+                    existing[k] = v
+        else:
+            nodes[artifact_id] = node
+
+    visited: Set[str] = set()
+    queue: List[str] = [root_id]
+
+    while queue:
+        current_id = queue.pop(0)
+        if current_id in visited:
+            continue
+        visited.add(current_id)
+
+        if current_id == root_id:
+            artifact = root_artifact
+        else:
+            artifact = id_to_artifact.get(current_id)
+            if artifact is None:
+                continue
+
+        cfg = load_config_for_artifact(artifact)
+        cfg_strings = _collect_strings(cfg) if isinstance(cfg, dict) else set()
+
+        source = "config_json" if cfg_strings else "metadata"
+        add_node_for_artifact(current_id, artifact, source=source)
+
+        if not cfg_strings:
+            continue
+
+        meta_cur = artifact.get("metadata") or {}
+        cur_name_norm = str(meta_cur.get("name") or "").strip().lower()
+
+        possible_parents: List[Tuple[int, str, Dict[str, Any]]] = []
+
+        for candidate_id, candidate in id_to_artifact.items():
+            if candidate_id == current_id:
+                continue
+
+            meta = candidate.get("metadata") or {}
+            cand_type = str(meta.get("type") or "").lower()
+
+            if cand_type != "model":
+                continue
+
+            name = meta.get("name")
+            cand_name_norm = name.strip().lower() if isinstance(name, str) else ""
+            cid_norm = str(meta.get("id") or candidate_id).strip().lower()
+
+            def matches_token(token: str) -> bool:
+                return bool(token) and any(token in s or s in token for s in cfg_strings)
+
+            name_matches = cand_name_norm and matches_token(cand_name_norm)
+            id_matches = cid_norm and matches_token(cid_norm)
+
+            if not (name_matches or id_matches):
+                continue
+
+            score = 0
+            if cand_name_norm and cur_name_norm and cand_name_norm in cur_name_norm:
+                score = 3
+            elif name_matches:
+                score = 2
+            elif id_matches:
+                score = 1
+
+            possible_parents.append((score, candidate_id, candidate))
+
+        if possible_parents:
+            possible_parents.sort(key=lambda t: (-t[0], t[1]))
+            _, best_parent_id, best_parent_art = possible_parents[0]
+
+            add_node_for_artifact(best_parent_id, best_parent_art, source="config_json")
+
+            edges.append(
+                {
+                    "from_node_artifact_id": best_parent_id,
+                    "to_node_artifact_id": current_id,
+                    "relationship": "base_model",
+                }
+            )
+
+            if best_parent_id not in visited:
+                queue.append(best_parent_id)
+
+    if root_id not in nodes:
+        add_node_for_artifact(root_id, root_artifact, source="metadata")
 
     return {
-        "nodes": nodes,
-        "edges": filtered_edges,
+        "nodes": list(nodes.values()),
+        "edges": edges,
     }
