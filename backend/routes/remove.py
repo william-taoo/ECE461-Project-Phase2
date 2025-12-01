@@ -26,15 +26,23 @@ def delete_artifact(artifact_type: str, id: str):
     '''
     Delete an artifact given an id that matches 
     '''
-    if artifact_type == None or id == None:
+    if not artifact_type or not id:
         return jsonify({"error": "Missing field(s)"}), 400
-    
+
+    if artifact_type not in ("model", "dataset", "code"):
+        return jsonify({"error": "Invalid artifact_type"}), 400
+
     registry_path = current_app.config["REGISTRY_PATH"]
     registry = load_registry(registry_path)
+
     artifact = registry.get(id)
     if not artifact:
         return jsonify({"error": "Artifact not found"}), 404
-    
+
+    md = artifact.get("metadata", {})
+    if md.get("type") != artifact_type:
+        return jsonify({"error": "Invalid artifact type"}), 400
+
     del registry[id]
     save_registry(registry_path, registry)
 
