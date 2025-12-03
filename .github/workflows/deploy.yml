@@ -59,6 +59,7 @@ jobs:
             script: |
               cd /home/ec2-user/projects/myapp/backend
               echo "RESET_PASSWORD=purduepete" > .env
+              echo "ENVIRONMENT=Prod" > .env
               sudo systemctl stop myapp || true
               source ../venv/bin/activate
               pip install --upgrade pip
