@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from pathlib import Path
 from datetime import datetime, timezone
 import boto3
+from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -126,7 +127,7 @@ def _as_dict(data):
         return out
     return {}
 
-def load_registry(path):
+def load_registry(path: Optional[str] = None):
     """
     Load the registry from S3. If it doesn't exist, return an empty dict.
     """
@@ -152,7 +153,7 @@ def load_registry(path):
         raise RuntimeError(f"Failed to load registry from S3: {e}") from e
 
 
-def save_registry(path, data):
+def save_registry(path: Optional[str] = None, data=None):
     """
     Save the registry to S3. Hii
     """
