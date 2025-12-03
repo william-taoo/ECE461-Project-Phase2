@@ -139,7 +139,7 @@ def load_registry():
 
 def save_registry(data):
     """
-    Save the registry to S3. Hi
+    Save the registry to S3. Hii
     """
     data = _as_dict(data)
     try:
