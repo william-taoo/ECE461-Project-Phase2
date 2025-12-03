@@ -40,7 +40,7 @@ def update_artifact(artifact_type: str, id: str):
     if ENV == "local":
         save_registry(registry_path, registry)
     else:
-        save_registry(registry)
+        save_registry(data=registry)
 
     # Add to audit
     name = "Name" # Change this later

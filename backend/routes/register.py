@@ -72,7 +72,7 @@ def register_artifact(artifact_type: str):
     if ENV == "local":
         save_registry(registry_path, registry)
     else:
-        save_registry(registry)
+        save_registry(data=registry)
 
     # Rate the artifact
     if artifact_type == "model":
@@ -85,7 +85,7 @@ def register_artifact(artifact_type: str):
                 if ENV == "local":
                     save_registry(registry_path, registry)
                 else:
-                    save_registry(registry)
+                    save_registry(data=registry)
                 return jsonify({"error": f"Failed to rate model: {response.text}"}), 424
             
             rating = response.json()
@@ -99,7 +99,7 @@ def register_artifact(artifact_type: str):
                 if ENV == "local":
                     save_registry(registry_path, registry)
                 else:
-                    save_registry(registry)
+                    save_registry(data=registry)
                 return jsonify({"error": f"Model rejected. Score too low: ({net_score}). Upload failed."}), 424
             
             # Save rating in artifact entry
@@ -122,14 +122,14 @@ def register_artifact(artifact_type: str):
             if ENV == "local":
                 save_registry(registry_path, registry)
             else:
-                save_registry(registry)
+                save_registry(data=registry)
         except Exception as e:
             del registry[artifact_id]
 
             if ENV == "local":
                 save_registry(registry_path, registry)
             else:
-                save_registry(registry)
+                save_registry(data=registry)
                 
             return jsonify({"error": f"Failed to rate model: {e}"}), 424
     

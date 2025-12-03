@@ -24,7 +24,7 @@ def reset_registry():
         registry_path = current_app.config["REGISTRY_PATH"]
         save_registry(registry_path, default)
     else:
-        save_registry(default)
+        save_registry(data=default)
    
     return jsonify({"message": "Registry has been reset"}), 200
 
@@ -58,6 +58,6 @@ def delete_artifact(artifact_type: str, id: str):
     if ENV == "local":
         save_registry(registry_path, registry)
     else:
-        save_registry(registry)
+        save_registry(data=registry)
 
     return jsonify({"message": "Artifact has been deleted"}), 200
