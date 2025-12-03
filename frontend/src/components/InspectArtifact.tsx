@@ -3,6 +3,7 @@ import { Modal, Button } from "react-bootstrap";
 import Download from "./Download";
 import Audit from "./Audit";
 import Lineage from "./Lineage";
+import Delete from "./Delete";
 
 interface InspectArtifactModalProps {
     show: boolean;
@@ -57,8 +58,14 @@ const InspectArtifactModal: React.FC<InspectArtifactModalProps> = ({ show, onClo
 
     return (
         <Modal show={show} onHide={onClose} centered size="lg">
-            <Modal.Header closeButton>
+            <Modal.Header closeButton className="d-flex align-items-center">
                 <Modal.Title>Artifact Details</Modal.Title>
+                <div style={{ width: "32px" }}></div>
+                <Delete 
+                    artifact_type={artifact.metadata.type}
+                    artifactID={artifact.metadata.id}
+                    onClose={onClose}
+                />
             </Modal.Header>
 
             <Modal.Body>

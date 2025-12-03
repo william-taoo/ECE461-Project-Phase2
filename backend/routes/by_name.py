@@ -1,7 +1,9 @@
 from flask import Blueprint, jsonify, request, current_app
 from utils.registry_utils import load_registry, iter_registry
+import os
 
 by_name_bp = Blueprint("by_name", __name__)
+ENV = os.getenv("ENVIRONMENT", "local")
 
 @by_name_bp.route("/artifact/byName/<name>", methods=["GET"])
 def artifact_by_name(name: str):
@@ -10,7 +12,11 @@ def artifact_by_name(name: str):
     if not clean:
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
-    registry = load_registry() or {}
+    if ENV == "local":
+        registry_path = current_app.config["REGISTRY_PATH"]
+        registry = load_registry(registry_path)
+    else:
+        registry = load_registry()
 
     out = []
     for aid, item in iter_registry(registry):

@@ -7,6 +7,7 @@ from utils.registry_utils import (
 )
 from utils.time_utils import ms_to_seconds
 import requests
+import os
 
 try:
     from CustomObjects.Model import Model as ModelClass
@@ -19,6 +20,7 @@ except Exception as e:
 
 
 rate_bp = Blueprint("rate", __name__)
+ENV = os.getenv("ENVIRONMENT", "local")
 
 @rate_bp.route("/artifact/model/<id>/rate", methods=["GET"])
 def rate_model(id):
@@ -44,7 +46,15 @@ def rate_model(id):
     if DatasetClass is None:
         return jsonify({"error": "Model implementation unavailable"}), 500
 
-    registry = load_registry()
+    if ENV == "local":
+        registry_path = current_app.config.get("REGISTRY_PATH")
+        if not registry_path:
+            return jsonify({"error": "Server misconfigured: REGISTRY_PATH unset"}), 500
+
+        registry = load_registry(registry_path)
+    else:
+        registry = load_registry()
+
     entry = find_model_in_registry(registry, id) or registry.get(id)
     if not entry:
         return jsonify({"error": "Artifact does not exist."}), 404
@@ -120,7 +130,11 @@ def rate_model(id):
 
     entry["rating"] = response
     registry[id] = entry
-    save_registry(registry)
+
+    if ENV == "local":
+        save_registry(registry_path, registry)
+    else:
+        save_registry(registry)
 
     # # Add to audit
     # name = "Name" # Change this later

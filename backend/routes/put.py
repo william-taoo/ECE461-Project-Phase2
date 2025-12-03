@@ -2,14 +2,20 @@ from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, save_registry, add_to_audit
 import jwt
 from datetime import datetime, timezone, timedelta
+import os
 
 
 put_bp = Blueprint("put", __name__)
+ENV = os.getenv("ENVIRONMENT", "local")
 
 @put_bp.route("/artifacts/<artifact_type>/<id>", methods=["PUT"])
 def update_artifact(artifact_type: str, id: str):
     # Access to config for registry path
-    registry = load_registry()
+    if ENV == "local":
+        registry_path = current_app.config["REGISTRY_PATH"]
+        registry = load_registry(registry_path)
+    else:
+        registry = load_registry()
     
     data = request.get_json()
     if not data:
@@ -29,7 +35,10 @@ def update_artifact(artifact_type: str, id: str):
 
     # Replace the artifact contents
     registry[id]["data"] = data
-    save_registry(registry)
+    if ENV == "local":
+        save_registry(registry_path, registry)
+    else:
+        save_registry(registry)
 
     # Add to audit
     name = "Name" # Change this later

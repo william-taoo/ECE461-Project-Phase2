@@ -5,6 +5,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 import boto3
 
+ENV = os.getenv("ENVIRONMENT", "local")
+
 HF_HOSTS = {"huggingface.co", "hf.co"}
 CODE_HOSTS = {
     "github.com", "gitlab.com", "bitbucket.org",
@@ -122,10 +124,21 @@ def _as_dict(data):
         return out
     return {}
 
-def load_registry():
+def load_registry(path):
     """
     Load the registry from S3. If it doesn't exist, return an empty dict.
     """
+    print(path)
+    if ENV == "local":
+        if not os.path.exists(path):
+            return {}
+        with open(path, "r") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
     try:
         response = s3.get_object(Bucket=BUCKET_NAME, Key=KEY)
         content = response["Body"].read().decode("utf-8")
@@ -137,11 +150,20 @@ def load_registry():
         raise RuntimeError(f"Failed to load registry from S3: {e}") from e
 
 
-def save_registry(data):
+def save_registry(path, data):
     """
-    Save the registry to S3.
+    Save the registry to S3. Hii
     """
     data = _as_dict(data)
+
+    if ENV == "local":
+        dirpath = os.path.dirname(os.path.abspath(path))
+        if dirpath and not os.path.exists(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(data, f, indent=4)
+        return 
+
     try:
         s3.put_object(
             Bucket=BUCKET_NAME,

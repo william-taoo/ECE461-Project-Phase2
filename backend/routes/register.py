@@ -8,8 +8,8 @@ from urllib.parse import urlparse
 from utils.artifact_size import get_artifact_size
 
 register_bp = Blueprint("artifact", __name__)
-
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
+ENV = os.getenv("ENVIRONMENT", "local")
 
 @register_bp.route("/artifact/<artifact_type>", methods=["POST"])
 def register_artifact(artifact_type: str):
@@ -21,7 +21,11 @@ def register_artifact(artifact_type: str):
     if artifact_type not in ("model", "dataset", "code"):
         return jsonify({"error": "invalid artifact_type"}), 400
 
-    registry = load_registry()
+    if ENV == "local":
+        registry_path = current_app.config["REGISTRY_PATH"]
+        registry = load_registry(registry_path)
+    else:
+        registry = load_registry()
 
     body = request.get_json(silent=True) or {}
     url = (body.get("url") or "").strip()
@@ -62,7 +66,10 @@ def register_artifact(artifact_type: str):
     else:
         registry.append(entry)
 
-    save_registry(registry)
+    if ENV == "local":
+        save_registry(registry_path, registry)
+    else:
+        save_registry(registry)
 
     # Rate the artifact
     if artifact_type == "model":
@@ -102,10 +109,19 @@ def register_artifact(artifact_type: str):
                 registry[artifact_id] = final_entry
             else:
                 registry.append(final_entry)
-            save_registry(registry)
+
+            if ENV == "local":
+                save_registry(registry_path, registry)
+            else:
+                save_registry(registry)
         except Exception as e:
             del registry[artifact_id]
-            save_registry(registry)
+
+            if ENV == "local":
+                save_registry(registry_path, registry)
+            else:
+                save_registry(registry)
+                
             return jsonify({"error": f"Failed to rate model: {e}"}), 424
     
     # # Add to audit

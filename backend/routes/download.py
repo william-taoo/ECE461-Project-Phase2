@@ -8,6 +8,7 @@ from utils.registry_utils import (
 
 
 download_bp = Blueprint("download", __name__)
+ENV = os.getenv("ENVIRONMENT", "local")
 
 @download_bp.route("/download/<model_id>", methods=["GET"])
 def download_model(model_id):
@@ -18,7 +19,11 @@ def download_model(model_id):
     - Sub aspects: weights, associated datasets, etc.
     We will get a component param, specifying what to download
     '''
-    registry = load_registry()
+    if ENV == "local":
+        registry_path = current_app.config["REGISTRY_PATH"]
+        registry = load_registry(registry_path)
+    else:
+        registry = load_registry()
 
     # Check if model is in registry
     model = find_model_in_registry(registry, model_id)
