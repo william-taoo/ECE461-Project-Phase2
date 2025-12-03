@@ -8,6 +8,8 @@ from utils.registry_utils import (
 from utils.time_utils import ms_to_seconds
 import requests
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 try:
     from CustomObjects.Model import Model as ModelClass

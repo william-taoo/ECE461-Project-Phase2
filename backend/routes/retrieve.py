@@ -5,6 +5,9 @@ import re
 import fnmatch
 import typing
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 
 retrieve_bp = Blueprint("retrieve", __name__)
 ENV = os.getenv("ENVIRONMENT", "local")

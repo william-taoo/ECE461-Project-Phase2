@@ -4,6 +4,8 @@ from urllib.parse import urlparse
 from pathlib import Path
 from datetime import datetime, timezone
 import boto3
+from dotenv import load_dotenv
+load_dotenv()
 
 ENV = os.getenv("ENVIRONMENT", "local")
 

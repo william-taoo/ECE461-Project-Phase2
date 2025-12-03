@@ -5,6 +5,8 @@ from utils.registry_utils import (
     find_model_in_registry,
     add_to_audit
 )
+from dotenv import load_dotenv
+load_dotenv()
 
 
 download_bp = Blueprint("download", __name__)

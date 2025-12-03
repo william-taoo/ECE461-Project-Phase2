@@ -3,6 +3,8 @@ from utils.registry_utils import load_registry, save_registry, add_to_audit
 import jwt
 from datetime import datetime, timezone, timedelta
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
 put_bp = Blueprint("put", __name__)

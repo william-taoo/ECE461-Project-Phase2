@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, save_registry
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 
 remove_bp = Blueprint("remove", __name__)

@@ -1,6 +1,9 @@
 from flask import Blueprint, jsonify, request, current_app
 from utils.registry_utils import load_registry, iter_registry
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 
 by_name_bp = Blueprint("by_name", __name__)
 ENV = os.getenv("ENVIRONMENT", "local")

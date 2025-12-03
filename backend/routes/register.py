@@ -6,6 +6,9 @@ from utils.registry_utils import load_registry, save_registry, infer_artifact_ty
 from huggingface_hub import HfApi
 from urllib.parse import urlparse
 from utils.artifact_size import get_artifact_size
+from dotenv import load_dotenv
+load_dotenv()
+
 
 register_bp = Blueprint("artifact", __name__)
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
