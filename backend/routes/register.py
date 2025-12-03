@@ -82,7 +82,10 @@ def register_artifact(artifact_type: str):
             response = requests.get(rate_url)
             if response.status_code != 200:
                 del registry[artifact_id]
-                save_registry(registry)
+                if ENV == "local":
+                    save_registry(registry_path, registry)
+                else:
+                    save_registry(registry)
                 return jsonify({"error": f"Failed to rate model: {response.text}"}), 424
             
             rating = response.json()
@@ -93,7 +96,10 @@ def register_artifact(artifact_type: str):
             if net_score < -1:
                 # Reject artifact
                 del registry[artifact_id]
-                save_registry(registry)
+                if ENV == "local":
+                    save_registry(registry_path, registry)
+                else:
+                    save_registry(registry)
                 return jsonify({"error": f"Model rejected. Score too low: ({net_score}). Upload failed."}), 424
             
             # Save rating in artifact entry
