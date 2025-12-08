@@ -24,4 +24,4 @@ charset-normalizer
 multidict
 yarl
 aiohttp
-zipstream
+zipstream-new
