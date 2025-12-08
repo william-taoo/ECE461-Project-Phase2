@@ -38,6 +38,7 @@ def get_artifacts():
     This will send a request for models in the registry 
     given a name and type
     """
+    # get path to registry
     if ENV == "local":
         registry_path = current_app.config.get("REGISTRY_PATH")
         assert registry_path is not None
@@ -45,82 +46,56 @@ def get_artifacts():
     else:
         registry = load_registry()
 
-    # Body MUST be an array of queries
-    body = request.get_json(force=True, silent=True)
+    # parse JSON safely (handle single element list) 
+    query = request.get_json(force=True, silent=True)
+    if isinstance(query, list) and len(query) == 1:
+        query = query[0]
 
-    if not isinstance(body, list) or len(body) == 0:
+    if not query or not isinstance(query, dict):
         return jsonify({"error": "Invalid request format"}), 400
 
-    # Validate each query
-    queries: list[dict] = []
-    for q in body:
-        if not isinstance(q, dict) or "name" not in q:
-            return jsonify({"error": "Invalid request format"}), 400
-        queries.append(q)
+    # query parameters
+    name_query = str(query.get("name", "*")).strip()
+    type_query = str(query.get("type", "all")).strip().lower()
+    version_query = str(query.get("version", "")).strip()
 
-    # Pagination
     try:
         offset = int(request.args.get("offset", 0))
     except Exception:
         offset = 0
     page_size = 10
 
-    results: list[dict] = []
+    results: typing.List[dict] = []
 
-    # Iterate all artifacts in the registry
+    # iterate items so we have artifact_id and artifact object
     for artifact_id, artifact in registry.items():
-        if not isinstance(artifact, dict):
+        meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
+        name = str(meta.get("name", "")) if isinstance(meta, dict) else ""
+        a_type = str(meta.get("type", "")).lower() if isinstance(meta, dict) else ""
+        version = str(meta.get("version", "")) if isinstance(meta, dict) else ""
+
+        # name filter
+        if name_query != "*" and name_query.lower() != name.lower():
             continue
 
-        meta = artifact.get("metadata", {})
-        if not isinstance(meta, dict):
-            meta = {}
+        # type filter
+        if type_query != "all" and a_type != type_query:
+            continue
 
-        name = str(meta.get("name", ""))
-        a_type = str(meta.get("type", "")).lower()
-        version = str(meta.get("version", ""))
-
-        # Artifact matches if it satisfies ANY of the queries (OR)
-        for q in queries:
-            name_query = str(q.get("name", "*")).strip()
-            version_query = str(q.get("version", "")).strip()
-
-            # Prefer 'types' (array); fall back to 'type' (string) if present
-            raw_types = q.get("types", None)
-            if raw_types is None and "type" in q:
-                raw_types = [q["type"]]
-
-            # ----- Name filter -----
-            # "*" means wildcard; otherwise exact, case-insensitive
-            if name_query != "*" and name_query.lower() != name.lower():
+        # version filter (supports wildcard)
+        if version_query:
+            if "*" in version_query:
+                if not fnmatch.fnmatch(version, version_query):
+                    continue
+            elif version_query != version:
                 continue
 
-            # ----- Type filter (if provided) -----
-            if raw_types is not None:
-                if isinstance(raw_types, list):
-                    type_set = {str(t).lower() for t in raw_types}
-                else:
-                    type_set = {str(raw_types).lower()}
-                if a_type not in type_set:
-                    continue
+        results.append(serialize_artifact(artifact_id, artifact))
 
-            # ----- Version filter (supports simple wildcard) -----
-            if version_query:
-                if "*" in version_query:
-                    if not fnmatch.fnmatch(version, version_query):
-                        continue
-                elif version_query != version:
-                    continue
-
-            # If we reach here, artifact matches this query
-            results.append(serialize_artifact(artifact_id, artifact))
-            break  # no need to test other queries for this artifact
-
-    # Too many results
+    # limit guard if too many artifacts are returned
     if len(results) > 100:
         return jsonify({"error": "Too many artifacts returned"}), 413
 
-    # Pagination window
     paginated = results[offset: offset + page_size]
     next_offset = offset + len(paginated)
 
