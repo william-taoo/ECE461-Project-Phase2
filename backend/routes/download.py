@@ -24,7 +24,7 @@ def extract_hf_repo_id(url: str) -> t.Optional[str]:
         https://huggingface.co/WinKawaks/vit-tiny-patch16-224
         WinKawaks/vit-tiny-patch16-224
     """
-    
+
     try:
         path = urlparse(url).path.strip("/")
         parts = path.split("/")
@@ -172,9 +172,7 @@ def stream_zip_of_hf_repo(repo_id: str, component: t.Optional[str] = None) -> zi
 
         # arcname should be the filename relative to repo root
         generator = stream_hf_file(repo_id, filename)
-        # z.write_iter(arcname=filename, iterator=generator)
         z.write_iter(filename, generator)
-
 
     return z
 
@@ -209,9 +207,6 @@ def make_presigned_url(s3_key: str, expires_in: int = 7 * 24 * 3600) -> str:
     )
 
 
-# ---------------------------
-# Flask route
-# ---------------------------
 @download_bp.route("/download/<model_id>", methods=["GET"])
 def download_model(model_id):
     """
@@ -247,10 +242,7 @@ def download_model(model_id):
     component = request.args.get("component", "full")
     expiry_seconds = int(request.args.get("expiry_seconds", 7 * 24 * 3600))
 
-    # If local_path exists and is accessible, you can stream that directory as well.
-    # But beware: local files may be large — keep this branch only if you are sure local_path is safe.
     if local_path:
-        # Optional: implement local path streaming to ZIP (not covered here) — for safety we prefer HF streaming branch.
         pass
 
     # HF path
@@ -260,17 +252,17 @@ def download_model(model_id):
             return jsonify({"error": "Invalid HuggingFace URL"}), 400
 
         try:
-            # Build zipstream
+            # build zipstream
             zip_stream = stream_zip_of_hf_repo(repo_id, component if component != "full" else None)
 
             # S3 key naming
             safe_artifact = artifact_name.replace("/", "_")
             s3_key = f"models/{model_id}/{component or 'full'}/{safe_artifact}.zip"
 
-            # Upload (streaming)
+            # upload (streaming)
             upload_zip_stream_to_s3(zip_stream, s3_key)
 
-            # Produce presigned URL
+            # produce presigned URL
             presigned = make_presigned_url(s3_key, expires_in=expiry_seconds)
 
             return jsonify({
