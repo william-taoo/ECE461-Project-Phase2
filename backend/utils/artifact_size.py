@@ -118,7 +118,7 @@ def get_artifact_size(url: str, artifact_type: str) -> int:
         r = requests.get(api_url, timeout=5)
         r.raise_for_status()
         data = r.json()
-        return data["size"] / 1024   # GitHub reports KB → bytes
+        return data["size"] * 1024   # GitHub reports KB → bytes
 
     # return 0 if unsupported type (not GitHub or Hugging Face)
     return 0
