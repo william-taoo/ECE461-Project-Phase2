@@ -1,124 +1,290 @@
-from flask import Blueprint, jsonify, request, send_file, current_app
-import os
-import tempfile
-import zipfile
-import shutil
+import io
+import re
+import typing as t
 from urllib.parse import urlparse
-from huggingface_hub import snapshot_download
-from typing import Optional
-from utils.registry_utils import (
-    load_registry,
-    find_model_in_registry,
-    add_to_audit
-)
+
+import boto3
+import requests
+import zipstream
+from flask import Blueprint, current_app, jsonify, request
 from dotenv import load_dotenv
 load_dotenv()
 
+from utils.registry_utils import load_registry, find_model_in_registry, add_to_audit
+
 download_bp = Blueprint("download", __name__)
-ENV = os.getenv("ENVIRONMENT", "local")
+BUCKET = "461-phase2-team12"
+S3_CLIENT = boto3.client("s3", region_name="us-east-2")
 
 
-def extract_hf_repo_id(url: str) -> Optional[str]:
+def extract_hf_repo_id(url: str) -> t.Optional[str]:
     """
     Convert a HuggingFace URL into a repo ID.
     Example:
         https://huggingface.co/WinKawaks/vit-tiny-patch16-224
-        --->
         WinKawaks/vit-tiny-patch16-224
     """
     
     try:
         path = urlparse(url).path.strip("/")
         parts = path.split("/")
-
         if len(parts) < 2:
             return None
-
         return "/".join(parts[:2])
-
     except Exception:
         return None
 
 
+def list_hf_files(repo_id: str) -> t.List[str]:
+    """
+    List files (siblings) in a HF model repo via HF API.
+    """
+    api = f"https://huggingface.co/api/models/{repo_id}"
+    r = requests.get(api, timeout=30)
+    r.raise_for_status()
+    data = r.json()
+    siblings = data.get("siblings", [])
+    # rfilename is the relative path in repo
+    return [s.get("rfilename") for s in siblings if s.get("rfilename")]
+
+
+def stream_hf_file(repo_id: str, filename: str, chunk_size: int = 512 * 1024):
+    """
+    Generator that yields bytes for a file in HF repo.
+    Uses the 'resolve/main' raw file endpoint.
+    """
+    url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
+    with requests.get(url, stream=True, timeout=60) as r:
+        r.raise_for_status()
+        for chunk in r.iter_content(chunk_size=chunk_size):
+            if chunk:
+                yield chunk
+
+
+def filename_matches_component(filename: str, component: t.Optional[str]) -> bool:
+    """
+    Simple heuristics for partitioning a HF repo into 'weights', 'tokenizer', 'dataset', 'configs', or 'full'.
+    You can extend this logic to suit your project's naming conventions.
+    """
+    if component in (None, "full"):
+        return True
+
+    lower = filename.lower()
+
+    if component == "weights":
+        # model weights / checkpoints often have these markers / extensions
+        return bool(re.search(r"(pytorch_model|model_weights|\.bin$|\.pt$|\.safetensors$)", lower))
+
+    if component == "tokenizer":
+        return "tokenizer" in lower or "vocab" in lower or "merges" in lower
+
+    if component == "dataset":
+        return "dataset" in lower or lower.startswith("data/") or "/data/" in lower
+
+    if component == "configs":
+        return "config" in lower or lower.endswith(".json") and ("config" in lower or "model" in lower)
+
+    # fallback: treat as full
+    return True
+
+
+class IteratorFileObj(io.RawIOBase):
+    """
+    Adapter: turn an iterator that yields bytes (chunks) into a file-like object
+    with a .read(size) method so boto3.upload_fileobj can stream from it.
+
+    The underlying iterator should yield bytes.
+    """
+
+    def __init__(self, iterator: t.Iterator[bytes]):
+        self._it = iterator
+        self._buf = bytearray()
+        self._eof = False
+
+    def readable(self):
+        return True
+
+    def readinto(self, b: bytearray) -> int:
+        # readinto is preferred by boto3 for file-like objects
+        if self._eof and not self._buf:
+            return 0  # EOF
+
+        # fill buffer until we have at least len(b) or EOF
+        while len(self._buf) < len(b) and not self._eof:
+            try:
+                chunk = next(self._it)
+            except StopIteration:
+                self._eof = True
+                break
+            if chunk:
+                self._buf.extend(chunk)
+
+        # copy into b
+        read_len = min(len(b), len(self._buf))
+        if read_len == 0:
+            return 0
+
+        b[:read_len] = self._buf[:read_len]
+        del self._buf[:read_len]
+        return read_len
+
+    # For compatibility, also provide read()
+    def read(self, size: int = -1) -> bytes:
+        if size == -1:
+            # consume iterator fully
+            chunks = [bytes(self._buf)]
+            self._buf.clear()
+            for c in self._it:
+                chunks.append(c)
+            self._eof = True
+            return b"".join(chunks)
+        else:
+            out = bytearray()
+            while len(out) < size and not self._eof:
+                if self._buf:
+                    take = min(size - len(out), len(self._buf))
+                    out.extend(self._buf[:take])
+                    del self._buf[:take]
+                else:
+                    try:
+                        chunk = next(self._it)
+                    except StopIteration:
+                        self._eof = True
+                        break
+                    self._buf.extend(chunk)
+            return bytes(out)
+
+
+def stream_zip_of_hf_repo(repo_id: str, component: t.Optional[str] = None) -> zipstream.ZipFile:
+    """
+    Build a zipstream.ZipFile where each file is added via write_iter using HF file streaming.
+    """
+    z = zipstream.ZipFile(mode="w", compression=zipstream.ZIP_DEFLATED)
+
+    all_files = list_hf_files(repo_id)
+    if not all_files:
+        raise RuntimeError("No files found in HF repo")
+
+    # add only files matching the requested component subset
+    for filename in all_files:
+        if not filename_matches_component(filename, component):
+            continue
+
+        # arcname should be the filename relative to repo root
+        generator = stream_hf_file(repo_id, filename)
+        # z.write_iter(arcname=filename, iterator=generator)
+        z.write_iter(filename, generator)
+
+
+    return z
+
+
+def upload_zip_stream_to_s3(zip_stream: zipstream.ZipFile, s3_key: str) -> None:
+    """
+    Upload a zipstream.ZipFile to S3 by wrapping the zip_stream's iterator into a file-like object.
+    This avoids writing the zip to disk.
+    """
+    # zip_stream is iterable: iter(zip_stream) yields chunks (bytes)
+    iterator = iter(zip_stream)
+
+    file_obj = IteratorFileObj(iterator)
+
+    # upload_fileobj will stream from file_obj
+    S3_CLIENT.upload_fileobj(
+        Fileobj=file_obj,
+        Bucket=BUCKET,
+        Key=s3_key
+    )
+
+
+def make_presigned_url(s3_key: str, expires_in: int = 7 * 24 * 3600) -> str:
+    """
+    Create a presigned GET URL for the uploaded object.
+    Default expiry: 7 days.
+    """
+    return S3_CLIENT.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": BUCKET, "Key": s3_key},
+        ExpiresIn=expires_in,
+    )
+
+
+# ---------------------------
+# Flask route
+# ---------------------------
 @download_bp.route("/download/<model_id>", methods=["GET"])
 def download_model(model_id):
-    '''
-    Download a zipped model from the registry.
+    """
+    Stream-download a model from HuggingFace (or local path in registry) and upload a ZIP to S3,
+    returning a presigned URL.
 
-    Can be downloaded with these options:
-        - Full model package,
-        - Sub aspects: weights, associated datasets, etc.
-    
-    We will get a component param, specifying what to download.
-    '''
+    Query params:
+        component = full | weights | tokenizer | dataset | configs  (default: full)
+        expiry_seconds = int (optional, presigned url expiry)
+    """
+    ENV = current_app.config.get("ENVIRONMENT", "local")
 
-    # load registry
+    # load registry (same as your previous code)
     if ENV == "local":
         registry_path = current_app.config["REGISTRY_PATH"]
         registry = load_registry(registry_path)
     else:
         registry = load_registry()
 
-    # check if model is in registry
     model = find_model_in_registry(registry, model_id)
     if not model:
         return jsonify({"error": "Model not found"}), 404
-    
-    # determine download source
-    hf_url = model.get("data", {}).get("url")
-    local_path = model.get("path")
-    
-    # add to audit
-    name = "Name" # Change this later
-    admin = False # Change this later
-    artifact_name = model["metadata"]["name"]
+
+    # audit
+    name = "Name"  # replace with current user
+    admin = False  # replace accordingly
+    artifact_name = model["metadata"].get("name", model_id)
     add_to_audit(name, admin, "model", model_id, artifact_name, "DOWNLOAD")
 
-    # create temp directory
-    temp_dir = tempfile.mkdtemp()
+    hf_url = model.get("data", {}).get("url")
+    local_path = model.get("path")
 
-    try:
-        # CASE 1: hugging face url
-        if hf_url and "huggingface.co" in hf_url:
-            repo_id = extract_hf_repo_id(hf_url)
-            if not repo_id:
-                return jsonify({"error": "Invalid HuggingFace URL"}), 400
+    component = request.args.get("component", "full")
+    expiry_seconds = int(request.args.get("expiry_seconds", 7 * 24 * 3600))
 
-            # download with HuggingFace Hub
-            repo_dir = snapshot_download(
-                repo_id=repo_id,
-                local_dir=temp_dir,
-                local_dir_use_symlinks=False,
-            )
-            source_dir = repo_dir
+    # If local_path exists and is accessible, you can stream that directory as well.
+    # But beware: local files may be large — keep this branch only if you are sure local_path is safe.
+    if local_path:
+        # Optional: implement local path streaming to ZIP (not covered here) — for safety we prefer HF streaming branch.
+        pass
 
-        # CASE 2: local path
-        elif local_path and os.path.exists(local_path):
-            source_dir = local_path
+    # HF path
+    if hf_url and "huggingface.co" in hf_url:
+        repo_id = extract_hf_repo_id(hf_url)
+        if not repo_id:
+            return jsonify({"error": "Invalid HuggingFace URL"}), 400
 
-        else:
-            return jsonify({"error": "Model source not found"}), 404
+        try:
+            # Build zipstream
+            zip_stream = stream_zip_of_hf_repo(repo_id, component if component != "full" else None)
 
-        # zip model
-        zip_name = f"{artifact_name.replace('/', '_')}.zip"
-        zip_path = os.path.join(temp_dir, zip_name)
+            # S3 key naming
+            safe_artifact = artifact_name.replace("/", "_")
+            s3_key = f"models/{model_id}/{component or 'full'}/{safe_artifact}.zip"
 
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(source_dir):
-                for file in files:
-                    full_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(full_path, source_dir)
-                    zipf.write(full_path, rel_path)
+            # Upload (streaming)
+            upload_zip_stream_to_s3(zip_stream, s3_key)
 
-        return send_file(
-            zip_path,
-            mimetype="application/zip",
-            as_attachment=True,
-            download_name=zip_name
-        )
+            # Produce presigned URL
+            presigned = make_presigned_url(s3_key, expires_in=expiry_seconds)
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            return jsonify({
+                "message": "Model packaged and uploaded",
+                "s3_key": s3_key,
+                "url": presigned,
+                "component": component,
+                "repo_id": repo_id,
+            })
 
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        except requests.HTTPError as re:
+            return jsonify({"error": "Error fetching from HuggingFace", "details": str(re)}), 502
+        except Exception as e:
+            return jsonify({"error": "Internal error", "details": str(e)}), 500
+
+    else:
+        return jsonify({"error": "Model source not supported (no huggingface url and no local path)"}), 404
