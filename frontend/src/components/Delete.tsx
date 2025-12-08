@@ -15,7 +15,7 @@ const Delete: React.FC<DeleteProps> = ({ artifact_type, artifactID, onClose }) =
             await fetch(`${API_BASE}/artifacts/${artifact_type}/${artifactID}`, {
                 method: "DELETE",
             });
-            alert("Registry reset.");
+            alert("Artifact Deleted.");
             onClose();
         } catch (error) {
             console.error("Error deleting artifact:", error);

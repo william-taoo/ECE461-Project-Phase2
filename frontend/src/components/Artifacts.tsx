@@ -5,6 +5,7 @@ import Download from "./Download";
 import SearchByQuery from "./SearchByQuery";
 import ModelByName from "./ModelByName";
 import InspectArtifactModal from "./InspectArtifact";
+import Regex from "./Regex";
 
 interface MetaData {
     id: string;
@@ -30,10 +31,12 @@ const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").rep
 const Artifacts: React.FC<ArtifactProps> = ({ onResult }) => {
     const [queryArtifacts, setQueryArtifacts] = useState<Artifact[]>([]);
     const [searchByNameArtifacts, setSearchByNameArtifacts] = useState<MetaData[]>([]);
+    const [regexArtifacts, setRegexArtifacts] = useState<MetaData[]>([]);
     const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
     const [showInspectModal, setShowInspectModal] = useState<boolean>(false);
     const [isSearchByQuery, setIsSearchByQuery] = useState<boolean>(false);
     const [isSearchByName, setIsSearchByName] = useState<boolean>(false);
+    const [isSearchByRegex, setIsSearchByRegex] = useState<boolean>(false);
 
     const inspectArtifact = async (id: string, type: string) => {
         try {
@@ -60,6 +63,7 @@ const Artifacts: React.FC<ArtifactProps> = ({ onResult }) => {
                         setSearchByNameArtifacts([]);
                         setIsSearchByQuery(true);
                         setIsSearchByName(false);
+                        setIsSearchByRegex(false);
                     }}
                 />
                 <ModelByName 
@@ -68,6 +72,16 @@ const Artifacts: React.FC<ArtifactProps> = ({ onResult }) => {
                         setQueryArtifacts([]);
                         setIsSearchByQuery(false);
                         setIsSearchByName(true);
+                        setIsSearchByRegex(false);
+                    }}
+                />
+                <Regex
+                    result={(data) => {
+                        setRegexArtifacts(data);
+                        setSearchByNameArtifacts([]);
+                        setIsSearchByQuery(false);
+                        setIsSearchByName(false);
+                        setIsSearchByRegex(true);
                     }}
                 />
             </div>
@@ -108,7 +122,24 @@ const Artifacts: React.FC<ArtifactProps> = ({ onResult }) => {
                 </div>
             )}
 
-            {!isSearchByQuery && !isSearchByName && (
+            {isSearchByRegex && regexArtifacts.length > 0 && (
+                <div className="max-h-[32rem] overflow-y-auto pr-2">
+                    <h3 className="text-lg font-semibold mb-2">Search Results (by regex)</h3>
+                    <ul className="space-y-3">
+                        {regexArtifacts.map((a) => (
+                            <li
+                                key={a.id}
+                                className="p-4 bg-gray-800 rounded-xl border border-gray-700 hover:border-gray-600 transition cursor-pointer"
+                                onClick={() => inspectArtifact(a.id, a.type)}
+                            >
+                                <div className="font-semibold">{a.name}</div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {!isSearchByQuery && !isSearchByName && !isSearchByRegex &&(
                 <p className="text-gray-300 text-center">No artifacts to display. Please use the search options above.</p>
             )}
 
