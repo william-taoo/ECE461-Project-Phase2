@@ -38,7 +38,6 @@ def get_artifacts():
     This will send a request for models in the registry 
     given a name and type
     """
-    # get path to registry
     if ENV == "local":
         registry_path = current_app.config.get("REGISTRY_PATH")
         assert registry_path is not None
@@ -46,56 +45,66 @@ def get_artifacts():
     else:
         registry = load_registry()
 
-    # parse JSON safely (handle single element list) 
-    query = request.get_json(force=True, silent=True)
-    if isinstance(query, list) and len(query) == 1:
-        query = query[0]
+    # Body must be an array of ArtifactQuery
+    body = request.get_json(force=True, silent=True)
 
-    if not query or not isinstance(query, dict):
+    if not isinstance(body, list) or len(body) == 0:
         return jsonify({"error": "Invalid request format"}), 400
 
-    # query parameters
-    name_query = str(query.get("name", "*")).strip()
-    type_query = str(query.get("type", "all")).strip().lower()
-    version_query = str(query.get("version", "")).strip()
+    # Validate each query shape
+    queries: list[dict] = []
+    for q in body:
+        if not isinstance(q, dict) or "name" not in q:
+            return jsonify({"error": "Invalid request format"}), 400
+        queries.append(q)
 
+    # Pagination
     try:
         offset = int(request.args.get("offset", 0))
     except Exception:
         offset = 0
     page_size = 10
 
-    results: typing.List[dict] = []
+    results: list[dict] = []
 
-    # iterate items so we have artifact_id and artifact object
     for artifact_id, artifact in registry.items():
         meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
         name = str(meta.get("name", "")) if isinstance(meta, dict) else ""
         a_type = str(meta.get("type", "")).lower() if isinstance(meta, dict) else ""
         version = str(meta.get("version", "")) if isinstance(meta, dict) else ""
 
-        # name filter
-        if name_query != "*" and name_query.lower() != name.lower():
-            continue
+        # An artifact matches if it satisfies ANY of the queries (OR)
+        for q in queries:
+            name_query = str(q.get("name", "*")).strip()
+            version_query = str(q.get("version", "")).strip()
+            types_list = q.get("types")  # this is an array per spec
 
-        # type filter
-        if type_query != "all" and a_type != type_query:
-            continue
-
-        # version filter (supports wildcard)
-        if version_query:
-            if "*" in version_query:
-                if not fnmatch.fnmatch(version, version_query):
-                    continue
-            elif version_query != version:
+            # Name filter
+            if name_query != "*" and name_query.lower() != name.lower():
                 continue
 
-        results.append(serialize_artifact(artifact_id, artifact))
+            # Types filter (if provided)
+            if types_list is not None:
+                if not isinstance(types_list, list) or len(types_list) == 0:
+                    return jsonify({"error": "Invalid request format"}), 400
+                type_set = {str(t).lower() for t in types_list}
+                if a_type not in type_set:
+                    continue
 
-    # limit guard if too many artifacts are returned
+            # Version filter (simple exact match for now)
+            if version_query:
+                if version_query != version:
+                    continue
+
+            # Passed all filters for this query
+            results.append(serialize_artifact(artifact_id, artifact))
+            break  # don’t need to check other queries for this artifact
+
+    # Too many results
     if len(results) > 100:
         return jsonify({"error": "Too many artifacts returned"}), 413
 
+    # Pagination
     paginated = results[offset: offset + page_size]
     next_offset = offset + len(paginated)
 
