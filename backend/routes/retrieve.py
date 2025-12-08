@@ -119,11 +119,10 @@ def get_name(name: str):
     Return metadata for all artifacts matching the provided name.
     Returns a list of serialized artifacts.
     """
-    # handle missing artifact name
     if not name or not name.strip():
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
-    # get path to registry
+    # Load registry
     if ENV == "local":
         registry_path = current_app.config.get("REGISTRY_PATH")
         assert registry_path is not None
@@ -134,14 +133,20 @@ def get_name(name: str):
     results = []
     query = name.strip().lower()
 
-    # append artifacts that match the name query
     for artifact_id, artifact in registry.items():
-        metadata = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
-        artifact_name = str(metadata.get("name", "")).strip().lower() if isinstance(metadata, dict) else ""
-        if artifact_name == query:
-            results.append(serialize_artifact(artifact_id, artifact))
+        if not isinstance(artifact, dict):
+            continue
 
-    # handle no results
+        metadata = artifact.get("metadata", {})
+        artifact_name = str(metadata.get("name", "")).strip().lower()
+
+        if artifact_name == query:
+            # include full artifact with top-level id/name/type/version/metadata
+            full = dict(artifact)
+            normalized = serialize_artifact(artifact_id, artifact)
+            full.update(normalized)
+            results.append(full)
+
     if not results:
         return jsonify({"error": "No artifacts found"}), 404
 
