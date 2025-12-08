@@ -11,12 +11,13 @@ def normalize_hf_url(url: str) -> str:
         return "https://huggingface.co/" + url[len("hf://"):]
 
     parsed = urlparse(url)
+    host = parsed.netloc.lower()
 
-    if parsed.netloc != "huggingface.co":
+    if not host.endswith("huggingface.co"):
         raise ValueError("Invalid repository URL: must point to huggingface.co")
 
     path = parsed.path.strip("/")
-    if path == "":
+    if not path:
         raise ValueError("Invalid repository URL: missing path")
 
     return f"https://huggingface.co/{path}"
@@ -86,7 +87,7 @@ def get_artifact_size(url: str, artifact_type: str) -> int:
         url = normalize_hf_url(url)
 
     parsed = urlparse(url)
-    host = parsed.netloc
+    host = parsed.netloc.lower()
     parts = parsed.path.strip("/").split("/")
 
     # HuggingFace
