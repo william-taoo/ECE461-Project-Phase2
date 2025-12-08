@@ -14,7 +14,7 @@ async def fetch_one(session, url):
     async with session.get(url) as resp:
         content = await resp.read()
         end = time.time()
-        return {'status': resp.status, 'bytes': len(content), 'latency_ms': (start-end) * 1000}
+        return {'status': resp.status, 'bytes': len(content), 'latency_ms': (end - start) * 1000}
 
 async def run_round():
     timeout = aiohttp.ClientTimeout(total=600) # Allow long downloads
