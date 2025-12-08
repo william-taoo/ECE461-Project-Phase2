@@ -52,6 +52,7 @@ def split_hf_repo(parts):
       ["datasets", "owner", "repo"]
     Returns (owner, repo, repo_id)
     """
+    NON_REPO_SEGMENTS = {"blob", "resolve", "tree", "viewer", "raw"}
 
     # Case 1: single-segment repo
     if len(parts) == 1:
@@ -63,9 +64,14 @@ def split_hf_repo(parts):
         if len(parts) == 2:
             repo = parts[1]
             return None, repo, repo
-        else:
-            owner, repo = parts[1], parts[2]
-            return owner, repo, f"{owner}/{repo}"
+        elif len(parts) >= 3:
+            second, third = parts[1], parts[2]
+            if third in NON_REPO_SEGMENTS:
+                repo = second
+                return None, repo, repo
+            else:
+                owner, repo = second, third
+                return owner, repo, f"{owner}/{repo}"
 
     # Case 3: normal owner/repo
     owner, repo = parts[0], parts[1]
