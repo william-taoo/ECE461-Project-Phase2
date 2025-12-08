@@ -38,6 +38,7 @@ def get_artifacts():
     This will send a request for models in the registry 
     given a name and type
     """
+    # get path to registry
     if ENV == "local":
         registry_path = current_app.config.get("REGISTRY_PATH")
         assert registry_path is not None
@@ -45,66 +46,56 @@ def get_artifacts():
     else:
         registry = load_registry()
 
-    # Body must be an array of ArtifactQuery
-    body = request.get_json(force=True, silent=True)
+    # parse JSON safely (handle single element list) 
+    query = request.get_json(force=True, silent=True)
+    if isinstance(query, list) and len(query) == 1:
+        query = query[0]
 
-    if not isinstance(body, list) or len(body) == 0:
+    if not query or not isinstance(query, dict):
         return jsonify({"error": "Invalid request format"}), 400
 
-    # Validate each query shape
-    queries: list[dict] = []
-    for q in body:
-        if not isinstance(q, dict) or "name" not in q:
-            return jsonify({"error": "Invalid request format"}), 400
-        queries.append(q)
+    # query parameters
+    name_query = str(query.get("name", "*")).strip()
+    type_query = str(query.get("type", "all")).strip().lower()
+    version_query = str(query.get("version", "")).strip()
 
-    # Pagination
     try:
         offset = int(request.args.get("offset", 0))
     except Exception:
         offset = 0
     page_size = 10
 
-    results: list[dict] = []
+    results: typing.List[dict] = []
 
+    # iterate items so we have artifact_id and artifact object
     for artifact_id, artifact in registry.items():
         meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
         name = str(meta.get("name", "")) if isinstance(meta, dict) else ""
         a_type = str(meta.get("type", "")).lower() if isinstance(meta, dict) else ""
         version = str(meta.get("version", "")) if isinstance(meta, dict) else ""
 
-        # An artifact matches if it satisfies ANY of the queries (OR)
-        for q in queries:
-            name_query = str(q.get("name", "*")).strip()
-            version_query = str(q.get("version", "")).strip()
-            types_list = q.get("types")  # this is an array per spec
+        # name filter
+        if name_query != "*" and name_query.lower() != name.lower():
+            continue
 
-            # Name filter
-            if name_query != "*" and name_query.lower() != name.lower():
+        # type filter
+        if type_query != "all" and a_type != type_query:
+            continue
+
+        # version filter (supports wildcard)
+        if version_query:
+            if "*" in version_query:
+                if not fnmatch.fnmatch(version, version_query):
+                    continue
+            elif version_query != version:
                 continue
 
-            # Types filter (if provided)
-            if types_list is not None:
-                if not isinstance(types_list, list) or len(types_list) == 0:
-                    return jsonify({"error": "Invalid request format"}), 400
-                type_set = {str(t).lower() for t in types_list}
-                if a_type not in type_set:
-                    continue
+        results.append(serialize_artifact(artifact_id, artifact))
 
-            # Version filter (simple exact match for now)
-            if version_query:
-                if version_query != version:
-                    continue
-
-            # Passed all filters for this query
-            results.append(serialize_artifact(artifact_id, artifact))
-            break  # don’t need to check other queries for this artifact
-
-    # Too many results
+    # limit guard if too many artifacts are returned
     if len(results) > 100:
         return jsonify({"error": "Too many artifacts returned"}), 413
 
-    # Pagination
     paginated = results[offset: offset + page_size]
     next_offset = offset + len(paginated)
 
@@ -119,10 +110,11 @@ def get_name(name: str):
     Return metadata for all artifacts matching the provided name.
     Returns a list of serialized artifacts.
     """
+    # handle missing artifact name
     if not name or not name.strip():
         return jsonify({"error": "Missing or invalid artifact name"}), 400
 
-    # Load registry
+    # get path to registry
     if ENV == "local":
         registry_path = current_app.config.get("REGISTRY_PATH")
         assert registry_path is not None
@@ -133,20 +125,14 @@ def get_name(name: str):
     results = []
     query = name.strip().lower()
 
+    # append artifacts that match the name query
     for artifact_id, artifact in registry.items():
-        if not isinstance(artifact, dict):
-            continue
-
-        metadata = artifact.get("metadata", {})
-        artifact_name = str(metadata.get("name", "")).strip().lower()
-
+        metadata = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
+        artifact_name = str(metadata.get("name", "")).strip().lower() if isinstance(metadata, dict) else ""
         if artifact_name == query:
-            # include full artifact with top-level id/name/type/version/metadata
-            full = dict(artifact)
-            normalized = serialize_artifact(artifact_id, artifact)
-            full.update(normalized)
-            results.append(full)
+            results.append(serialize_artifact(artifact_id, artifact))
 
+    # handle no results
     if not results:
         return jsonify({"error": "No artifacts found"}), 404
 
