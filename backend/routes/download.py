@@ -2,15 +2,19 @@ import io
 import re
 import typing as t
 from urllib.parse import urlparse
-
 import boto3
 import requests
 import zipstream
 from flask import Blueprint, current_app, jsonify, request
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from utils.registry_utils import load_registry, find_model_in_registry, add_to_audit
+from utils.registry_utils import (
+    load_registry,
+    find_model_in_registry,
+    add_to_audit,
+)
 
 download_bp = Blueprint("download", __name__)
 BUCKET = "461-phase2-team12"
@@ -39,11 +43,20 @@ def list_hf_files(repo_id: str) -> t.List[str]:
     """
     List files (siblings) in a HF model repo via HF API.
     """
+
+    # build Hugging Face API endpoint
     api = f"https://huggingface.co/api/models/{repo_id}"
+
+    # send API request
     r = requests.get(api, timeout=30)
     r.raise_for_status()
+
+    # parse JSON response
     data = r.json()
+
+    # extract siblings list
     siblings = data.get("siblings", [])
+
     # rfilename is the relative path in repo
     return [s.get("rfilename") for s in siblings if s.get("rfilename")]
 
@@ -53,7 +66,11 @@ def stream_hf_file(repo_id: str, filename: str, chunk_size: int = 512 * 1024):
     Generator that yields bytes for a file in HF repo.
     Uses the 'resolve/main' raw file endpoint.
     """
+
+    # build the raw-file URL
     url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
+
+    # send streaming request
     with requests.get(url, stream=True, timeout=60) as r:
         r.raise_for_status()
         for chunk in r.iter_content(chunk_size=chunk_size):
@@ -61,11 +78,14 @@ def stream_hf_file(repo_id: str, filename: str, chunk_size: int = 512 * 1024):
                 yield chunk
 
 
-def filename_matches_component(filename: str, component: t.Optional[str]) -> bool:
+def filename_matches_component(
+    filename: str, component: t.Optional[str]
+) -> bool:
     """
-    Simple heuristics for partitioning a HF repo into 'weights', 'tokenizer', 'dataset', 'configs', or 'full'.
-    You can extend this logic to suit your project's naming conventions.
+    Simple heuristics for partitioning a HF repo into 'weights', 'tokenizer', 
+    'dataset', 'configs', or 'full'.
     """
+
     if component in (None, "full"):
         return True
 
@@ -73,16 +93,29 @@ def filename_matches_component(filename: str, component: t.Optional[str]) -> boo
 
     if component == "weights":
         # model weights / checkpoints often have these markers / extensions
-        return bool(re.search(r"(pytorch_model|model_weights|\.bin$|\.pt$|\.safetensors$)", lower))
+        return bool(
+            re.search(
+                r"(pytorch_model|model_weights|\.bin$|\.pt$|\.safetensors$)",
+                lower,
+            )
+        )
 
     if component == "tokenizer":
         return "tokenizer" in lower or "vocab" in lower or "merges" in lower
 
     if component == "dataset":
-        return "dataset" in lower or lower.startswith("data/") or "/data/" in lower
+        return (
+            "dataset" in lower
+            or lower.startswith("data/")
+            or "/data/" in lower
+        )
 
     if component == "configs":
-        return "config" in lower or lower.endswith(".json") and ("config" in lower or "model" in lower)
+        return (
+            "config" in lower
+            or lower.endswith(".json")
+            and ("config" in lower or "model" in lower)
+        )
 
     # fallback: treat as full
     return True
@@ -104,7 +137,7 @@ class IteratorFileObj(io.RawIOBase):
     def readable(self):
         return True
 
-    def readinto(self, b: bytearray) -> int:
+    def readinto(self, b: bytearray) -> int:  # type: ignore[override]
         # readinto is preferred by boto3 for file-like objects
         if self._eof and not self._buf:
             return 0  # EOF
@@ -128,7 +161,7 @@ class IteratorFileObj(io.RawIOBase):
         del self._buf[:read_len]
         return read_len
 
-    # For compatibility, also provide read()
+    # for compatibility, also provide read()
     def read(self, size: int = -1) -> bytes:
         if size == -1:
             # consume iterator fully
@@ -155,10 +188,14 @@ class IteratorFileObj(io.RawIOBase):
             return bytes(out)
 
 
-def stream_zip_of_hf_repo(repo_id: str, component: t.Optional[str] = None) -> zipstream.ZipFile:
+def stream_zip_of_hf_repo(
+    repo_id: str, component: t.Optional[str] = None
+) -> zipstream.ZipFile:
     """
-    Build a zipstream.ZipFile where each file is added via write_iter using HF file streaming.
+    Build a zipstream.ZipFile where each file is added via write_iter using HF 
+    file streaming.
     """
+
     z = zipstream.ZipFile(mode="w", compression=zipstream.ZIP_DEFLATED)
 
     all_files = list_hf_files(repo_id)
@@ -177,22 +214,21 @@ def stream_zip_of_hf_repo(repo_id: str, component: t.Optional[str] = None) -> zi
     return z
 
 
-def upload_zip_stream_to_s3(zip_stream: zipstream.ZipFile, s3_key: str) -> None:
+def upload_zip_stream_to_s3(
+    zip_stream: zipstream.ZipFile, s3_key: str
+) -> None:
     """
-    Upload a zipstream.ZipFile to S3 by wrapping the zip_stream's iterator into a file-like object.
-    This avoids writing the zip to disk.
+    Upload a zipstream.ZipFile to S3 by wrapping the zip_stream's iterator into 
+    a file-like object. This avoids writing the zip to disk.
     """
+
     # zip_stream is iterable: iter(zip_stream) yields chunks (bytes)
     iterator = iter(zip_stream)
 
-    file_obj = IteratorFileObj(iterator)
+    file_obj = IteratorFileObj(iterator)  # type: ignore
 
     # upload_fileobj will stream from file_obj
-    S3_CLIENT.upload_fileobj(
-        Fileobj=file_obj,
-        Bucket=BUCKET,
-        Key=s3_key
-    )
+    S3_CLIENT.upload_fileobj(Fileobj=file_obj, Bucket=BUCKET, Key=s3_key)
 
 
 def make_presigned_url(s3_key: str, expires_in: int = 7 * 24 * 3600) -> str:
@@ -200,6 +236,7 @@ def make_presigned_url(s3_key: str, expires_in: int = 7 * 24 * 3600) -> str:
     Create a presigned GET URL for the uploaded object.
     Default expiry: 7 days.
     """
+
     return S3_CLIENT.generate_presigned_url(
         "get_object",
         Params={"Bucket": BUCKET, "Key": s3_key},
@@ -213,42 +250,44 @@ def download_model(model_id):
     Return a presigned URL for a previously packaged model.
     No re-download from HuggingFace since registration stage already handled it.
     """
+
     ENV = current_app.config.get("ENVIRONMENT", "local")
 
-    # Load registry
+    # load registry
     if ENV == "local":
         registry_path = current_app.config["REGISTRY_PATH"]
         registry = load_registry(registry_path)
     else:
         registry = load_registry()
 
-    # Lookup model
+    # lookup model
     model = find_model_in_registry(registry, model_id)
     if not model:
         return jsonify({"error": "Model not found"}), 404
 
-    # Audit log
-    name = "Name"      # TODO: replace with authenticated username
-    admin = False      # TODO: replace accordingly
+    # audit log
+    name = "Name"  # TODO: replace with authenticated username
+    admin = False  # TODO: replace accordingly
     artifact_name = model["metadata"].get("name", model_id)
     add_to_audit(name, admin, "model", model_id, artifact_name, "DOWNLOAD")
 
-    # Get S3 key stored during registration
+    # get S3 key stored during registration
     s3_key = model.get("data", {}).get("s3_key")
     if not s3_key:
         return jsonify({"error": "Model was never packaged or uploaded"}), 500
 
-    # Get URL expiration override
+    # get URL expiration override
     expiry_seconds = int(request.args.get("expiry_seconds", 7 * 24 * 3600))
 
-    # Generate new presigned URL
+    # generate new presigned URL
     presigned_url = make_presigned_url(s3_key, expires_in=expiry_seconds)
 
-    return jsonify({
-        "message": "Model found",
-        "model_id": model_id,
-        "artifact_name": artifact_name,
-        "s3_key": s3_key,
-        "url": presigned_url,
-    })
-
+    return jsonify(
+        {
+            "message": "Model found",
+            "model_id": model_id,
+            "artifact_name": artifact_name,
+            "s3_key": s3_key,
+            "url": presigned_url,
+        }
+    )
