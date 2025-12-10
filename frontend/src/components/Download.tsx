@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import Button from "react-bootstrap/Button";
 import Spinner from "react-bootstrap/Spinner";
-import Form from "react-bootstrap/Form";
 
 const API_BASE = (process.env.REACT_APP_API_BASE ?? "http://localhost:5000").replace(/\/+$/, "");
 
@@ -11,7 +10,8 @@ interface DownloadProps {
 
 const Download: React.FC<DownloadProps> = ({ modelID }) => {
     const [downloading, setDownloading] = useState(false);
-    const [component, setComponent] = useState("full");
+
+    const component = "weights";
 
     const handleDownload = async () => {
         try {
@@ -54,42 +54,28 @@ const Download: React.FC<DownloadProps> = ({ modelID }) => {
     };
 
     return (
-        <div className="d-flex flex-column gap-2">
-            <Form.Select
-                value={component}
-                onChange={(e) => setComponent(e.target.value)}
-                disabled={downloading}
-            >
-                <option value="full">Full Model (everything)</option>
-                <option value="weights">Weights only</option>
-                <option value="tokenizer">Tokenizer only</option>
-                <option value="configs">Configs only</option>
-                <option value="dataset">Dataset only</option>
-            </Form.Select>
-
-            <Button
-                variant="success"
-                onClick={handleDownload}
-                disabled={downloading}
-                style={{ minWidth: "180px" }}
-            >
-                {downloading ? (
-                    <>
-                        <Spinner
-                            as="span"
-                            animation="border"
-                            size="sm"
-                            role="status"
-                            aria-hidden="true"
-                            className="me-2"
-                        />
-                        Downloading...
-                    </>
-                ) : (
-                    `Download (${component})`
-                )}
-            </Button>
-        </div>
+        <Button
+            variant="success"
+            onClick={handleDownload}
+            disabled={downloading}
+            style={{ minWidth: "180px" }}
+        >
+            {downloading ? (
+                <>
+                    <Spinner
+                        as="span"
+                        animation="border"
+                        size="sm"
+                        role="status"
+                        aria-hidden="true"
+                        className="me-2"
+                    />
+                    Downloading...
+                </>
+            ) : (
+                "Download"
+            )}
+        </Button>
     );
 };
 
