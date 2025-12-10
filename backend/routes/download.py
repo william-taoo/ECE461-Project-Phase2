@@ -210,73 +210,45 @@ def make_presigned_url(s3_key: str, expires_in: int = 7 * 24 * 3600) -> str:
 @download_bp.route("/download/<model_id>", methods=["GET"])
 def download_model(model_id):
     """
-    Stream-download a model from HuggingFace (or local path in registry) and upload a ZIP to S3,
-    returning a presigned URL.
-
-    Query params:
-        component = full | weights | tokenizer | dataset | configs  (default: full)
-        expiry_seconds = int (optional, presigned url expiry)
+    Return a presigned URL for a previously packaged model.
+    No re-download from HuggingFace since registration stage already handled it.
     """
     ENV = current_app.config.get("ENVIRONMENT", "local")
 
-    # load registry (same as your previous code)
+    # Load registry
     if ENV == "local":
         registry_path = current_app.config["REGISTRY_PATH"]
         registry = load_registry(registry_path)
     else:
         registry = load_registry()
 
+    # Lookup model
     model = find_model_in_registry(registry, model_id)
     if not model:
         return jsonify({"error": "Model not found"}), 404
 
-    # audit
-    name = "Name"  # replace with current user
-    admin = False  # replace accordingly
+    # Audit log
+    name = "Name"      # TODO: replace with authenticated username
+    admin = False      # TODO: replace accordingly
     artifact_name = model["metadata"].get("name", model_id)
     add_to_audit(name, admin, "model", model_id, artifact_name, "DOWNLOAD")
 
-    hf_url = model.get("data", {}).get("url")
-    local_path = model.get("path")
+    # Get S3 key stored during registration
+    s3_key = model.get("data", {}).get("s3_key")
+    if not s3_key:
+        return jsonify({"error": "Model was never packaged or uploaded"}), 500
 
-    component = request.args.get("component", "full")
+    # Get URL expiration override
     expiry_seconds = int(request.args.get("expiry_seconds", 7 * 24 * 3600))
 
-    if local_path:
-        pass
+    # Generate new presigned URL
+    presigned_url = make_presigned_url(s3_key, expires_in=expiry_seconds)
 
-    # HF path
-    if hf_url and "huggingface.co" in hf_url:
-        repo_id = extract_hf_repo_id(hf_url)
-        if not repo_id:
-            return jsonify({"error": "Invalid HuggingFace URL"}), 400
+    return jsonify({
+        "message": "Model found",
+        "model_id": model_id,
+        "artifact_name": artifact_name,
+        "s3_key": s3_key,
+        "url": presigned_url,
+    })
 
-        try:
-            # build zipstream
-            zip_stream = stream_zip_of_hf_repo(repo_id, component if component != "full" else None)
-
-            # S3 key naming
-            safe_artifact = artifact_name.replace("/", "_")
-            s3_key = f"models/{model_id}/{component or 'full'}/{safe_artifact}.zip"
-
-            # upload (streaming)
-            upload_zip_stream_to_s3(zip_stream, s3_key)
-
-            # produce presigned URL
-            presigned = make_presigned_url(s3_key, expires_in=expiry_seconds)
-
-            return jsonify({
-                "message": "Model packaged and uploaded",
-                "s3_key": s3_key,
-                "url": presigned,
-                "component": component,
-                "repo_id": repo_id,
-            })
-
-        except requests.HTTPError as re:
-            return jsonify({"error": "Error fetching from HuggingFace", "details": str(re)}), 502
-        except Exception as e:
-            return jsonify({"error": "Internal error", "details": str(e)}), 500
-
-    else:
-        return jsonify({"error": "Model source not supported (no huggingface url and no local path)"}), 404
