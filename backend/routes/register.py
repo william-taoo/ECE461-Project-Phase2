@@ -224,26 +224,32 @@ def register_artifact(artifact_type: str):
 
         else:
             try:
-                # Hugging Face model — download ONLY weights
-                if artifact_type == "model" and "huggingface.co" in url:
-                    repo_id = extract_hf_repo_id(url)
-                    if not repo_id:
-                        raise Exception("Invalid HuggingFace URL")
+                # # Hugging Face model — download ONLY weights
+                # if artifact_type == "model" and "huggingface.co" in url:
+                #     repo_id = extract_hf_repo_id(url)
+                #     if not repo_id:
+                #         raise Exception("Invalid HuggingFace URL")
 
-                    # download ONLY the weight files
-                    zip_stream = stream_zip_of_hf_repo(repo_id, component="weights")
+                #     # download ONLY the weight files
+                #     zip_stream = stream_zip_of_hf_repo(repo_id, component="weights")
 
-                    upload_zip_stream_to_s3(zip_stream, s3_key)
+                #     upload_zip_stream_to_s3(zip_stream, s3_key)
 
-                # Code or dataset -> upload a real placeholder zip
-                else:
-                    z_real = zipstream.ZipFile(
-                        mode="w", compression=zipstream.ZIP_DEFLATED
-                    )
-                    z_real.write_iter(
-                        "real_placeholder.txt", iter([b"real content"])
-                    )
-                    upload_zip_stream_to_s3(z_real, s3_key)
+                # # Code or dataset -> upload a real placeholder zip
+                # else:
+                #     z_real = zipstream.ZipFile(
+                #         mode="w", compression=zipstream.ZIP_DEFLATED
+                #     )
+                #     z_real.write_iter(
+                #         "real_placeholder.txt", iter([b"real content"])
+                #     )
+                #     upload_zip_stream_to_s3(z_real, s3_key)
+
+                z_real = zipstream.ZipFile(
+                        mode="w", compression=zipstream.ZIP_DEFLATED)
+                z_real.write_iter(
+                        "real_placeholder.txt", iter([b"real content"]))
+                upload_zip_stream_to_s3(z_real, s3_key)
 
             except Exception as zip_err:
                 # fallback empty ZIP
