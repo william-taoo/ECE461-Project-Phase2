@@ -8,13 +8,15 @@ import statistics
 performance_bp = Blueprint("performance", __name__)
 URL = "https://huggingface.co/arnir0/Tiny-LLM" # Replace with actual URL (EC2) with model contents
 CLIENTS = 100
+semaphore = asyncio.Semaphore(30)
 
 async def fetch_one(session, url):
-    start = time.time()
-    async with session.get(url) as resp:
-        content = await resp.read()
-        end = time.time()
-        return {'status': resp.status, 'bytes': len(content), 'latency_ms': (end - start) * 1000}
+    async with semaphore:
+        start = time.time()
+        async with session.get(url) as resp:
+            content = await resp.read()
+            end = time.time()
+            return {'status': resp.status, 'bytes': len(content), 'latency_ms': (end - start) * 1000}
 
 async def run_round():
     timeout = aiohttp.ClientTimeout(total=600) # Allow long downloads
