@@ -21,32 +21,22 @@ BUCKET = "461-phase2-team12"
 S3_CLIENT = boto3.client("s3", region_name="us-east-2")
 
 
-from urllib.parse import urlparse
-
-def extract_hf_repo_id(url: str) -> str | None:
+def extract_hf_repo_id(url: str) -> t.Optional[str]:
     """
-    Accepts:
-    - https://huggingface.co/user/model
-    - https://huggingface.co/model-name  (alias)
+    Convert a HuggingFace URL into a repo ID.
+    Example:
+        https://huggingface.co/WinKawaks/vit-tiny-patch16-224
+        WinKawaks/vit-tiny-patch16-224
     """
 
     try:
         path = urlparse(url).path.strip("/")
         parts = path.split("/")
-
-        # Canonical case: owner/model
-        if len(parts) == 2:
-            return f"{parts[0]}/{parts[1]}"
-
-        # Alias case: /model-name
-        if len(parts) == 1 and parts[0]:
-            # Assume official namespace
-            return f"{parts[0].split('-')[0]}/{parts[0]}"
-
+        if len(parts) < 2:
+            return None
+        return "/".join(parts[:2])
     except Exception:
-        pass
-
-    return None
+        return None
 
 
 def list_hf_files(repo_id: str) -> t.List[str]:
