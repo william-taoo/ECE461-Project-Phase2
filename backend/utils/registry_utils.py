@@ -79,7 +79,7 @@ def infer_artifact_type(url: str) -> str:
         raise ValueError("URL must be http(s)")
 
     host = (p.netloc or "").lower()
-    path = (p.path or "").strip("/")
+    path = (p.path or "").lower().strip("/")
 
     # Hugging Face
     if host in HF_HOSTS:
@@ -88,17 +88,27 @@ def infer_artifact_type(url: str) -> str:
             return "dataset"
         return "model"
 
-    # Common code hosts
-    if host in CODE_HOSTS:
-        return "code"
-
-    # Generic file servers/buckets: guess by extension
+    # File-based model detection
     for ext in MODEL_EXTS:
         if path.endswith(ext):
             return "model"
 
+    # Heuristics for datasets on GitHub / generic hosts
+    DATASET_KEYWORDS = (
+        "dataset", "data", "mnist", "cifar", "imagenet",
+        "benchmark", "samples"
+    )
+
+    if any(k in path for k in DATASET_KEYWORDS):
+        return "dataset"
+
+    # Code hosts default
+    if host in CODE_HOSTS:
+        return "code"
+
     # Unknown
     raise ValueError("Could not infer artifact type from URL")
+
 
 def _extract_id(entry):
     """Support both {id: ...} and {'metadata': {'id': ...}} shapes."""
