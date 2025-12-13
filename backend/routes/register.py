@@ -39,25 +39,6 @@ def s3_object_exists(bucket: str, key: str) -> bool:
         raise
 
 
-def resolve_hf_repo_id(url: str) -> str | None:
-    try:
-        path = urlparse(url).path.strip("/")
-        api = HfApi()
-
-        # If already owner/model
-        if path.count("/") == 1:
-            api.model_info(path)  # validates existence
-            return path
-
-        # If short name, resolve via search
-        models = api.list_models(search=path, limit=1)
-        if models:
-            return models[0].modelId
-
-    except Exception:
-        return None
-
-
 register_bp = Blueprint("artifact", __name__)
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 ENV = os.getenv("ENVIRONMENT", "local")
@@ -221,7 +202,7 @@ def register_artifact(artifact_type: str):
     try:
         # create stable S3 key 
         if artifact_type == "model" and "huggingface.co" in url:
-            repo_id = resolve_hf_repo_id(url)
+            repo_id = extract_hf_repo_id(url)
             if not repo_id:
                 return jsonify({"error": "Invalid HuggingFace URL"}), 400
             safe_name = repo_id.replace("/", "_")
