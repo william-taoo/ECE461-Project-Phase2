@@ -18,7 +18,7 @@ from routes.download import (
 
 import zipstream
 import boto3
-from huggingface_hub import HfApi, hf_hub_url
+from huggingface_hub import HfApi
 from urllib.parse import urlparse
 from utils.artifact_size import get_artifact_size
 from dotenv import load_dotenv
