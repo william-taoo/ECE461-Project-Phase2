@@ -20,9 +20,24 @@ except Exception as e:
     CodeClass = None
     DatasetClass = None
 
-
 rate_bp = Blueprint("rate", __name__)
 ENV = os.getenv("ENVIRONMENT", "local")
+
+
+def find_associated_artifact(registry, url_or_name_substr, artifact_type):
+    """Find dataset/code artifact in registry matching by URL substring or name substring."""
+    if not url_or_name_substr:
+        return None
+    for artifact_id, artifact in registry.items():
+        meta = artifact.get("metadata", {})
+        data = artifact.get("data", {})
+        if meta.get("type") != artifact_type:
+            continue
+        # Match by URL or name substring
+        if url_or_name_substr in (data.get("url") or "") or url_or_name_substr in (meta.get("name") or ""):
+            return artifact
+    return None
+
 
 @rate_bp.route("/artifact/model/<id>/rate", methods=["GET"])
 def rate_model(id):
@@ -70,6 +85,17 @@ def rate_model(id):
 
     if not model_url:
         return jsonify({"error": "Artifact is missing model url"}), 400
+    
+    # Find associated dataset and code artifacts from registry
+    dataset_entry = find_associated_artifact(registry, dataset_url or metadata.get("name"), "dataset")
+    if dataset_entry:
+        d_data = dataset_entry.get("data") or {}
+        dataset_url = d_data.get("url") or dataset_url  # use registry URL if available
+
+    code_entry = find_associated_artifact(registry, code_url or metadata.get("name"), "code")
+    if code_entry:
+        c_data = code_entry.get("data") or {}
+        code_url = c_data.get("url") or code_url  # use registry URL if available
     
     model = ModelClass(model_url=model_url, dataset_url=dataset_url, code_url=code_url)
 
