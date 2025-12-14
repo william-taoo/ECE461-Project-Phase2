@@ -19,7 +19,7 @@ const SearchByQuery: React.FC<SearchByQueryProps> = ({ result }) => {
         try {
             const query = {
                 name: (searchName || "*").trim(),
-                type: searchType === "all" ? "all" : searchType,
+                type: searchType === "all" ? [] : searchType,
             };
 
             const endpoint = `${API_BASE}/artifacts`;
@@ -28,7 +28,7 @@ const SearchByQuery: React.FC<SearchByQueryProps> = ({ result }) => {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(query),
+                body: JSON.stringify([query]),
             });
             const text = await res.text();
             if (!res.ok) {

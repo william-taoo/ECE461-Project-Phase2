@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import load_registry, add_to_audit, get_audit_entries
 from utils.lineage_utils import build_lineage_graph
+from typing import Any, Optional, Set
 import re
 import fnmatch
 import typing
@@ -22,10 +23,9 @@ def serialize_artifact(artifact_id: str, artifact: dict) -> dict:
     
     # if metadata has id, prefer the dictionary key (artifact_id) as canonical id.
     return {
-        "id": str(artifact_id),
         "name": metadata.get("name", "") if isinstance(metadata, dict) else "",
+        "id": str(artifact_id),
         "type": metadata.get("type", "") if isinstance(metadata, dict) else "",
-        "version": metadata.get("version", "") if isinstance(metadata, dict) else "",
         
         # keep original metadata object (empty dict if missing)
         "metadata": metadata if isinstance(metadata, dict) else {}
@@ -54,82 +54,92 @@ def get_artifacts():
         queries = query
     else:
         return jsonify({"error": "Invalid request format"}), 400
-    
-    if not queries:
+
+    if not queries or any(not isinstance(q, dict) for q in queries):
         return jsonify({"error": "Invalid request format"}), 400
 
+    allowed_types = {"model", "dataset", "code"}
+    def normalize_types(raw: Any) -> Optional[Set[str]]:
+        if raw is None:
+            return None
+        if isinstance(raw, str):
+            t = raw.strip().lower()
+            if t in ("", "all", "*"):
+                return None
+            if t not in allowed_types:
+                raise ValueError("Invalid type")
+            return {t}
+        if isinstance(raw, list):
+            s = {str(x).strip().lower() for x in raw if str(x).strip()}
+            if not s or "all" in s or "*" in s:
+                return None
+            if any(t not in allowed_types for t in s):
+                raise ValueError("Invalid type")
+            return s
+
+        raise ValueError("Invalid types")
+    
     norm_queries = []
     for q in queries:
-        if not isinstance(q, dict):
-            return jsonify({"error": "Invalid request format"}), 400
-
-        name_q = q.get("name", None)
+        name_q = q.get("name")
         if not isinstance(name_q, str) or not name_q.strip():
             return jsonify({"error": "Missing or invalid name"}), 400
         name_q = name_q.strip()
 
-        # Spec uses "types" (plural). Keep legacy "type" as fallback.
-        types_raw = q.get("types", None)
-        if types_raw is None:
-            types_raw = q.get("type", None)
-
-        if types_raw is None:
-            types_q = None  # None => match all
-        elif isinstance(types_raw, str):
-            types_q = {types_raw.strip().lower()} if types_raw.strip() else None
-        elif isinstance(types_raw, list):
-            types_q = {str(t).strip().lower() for t in types_raw if str(t).strip()}
-            if not types_q:
-                types_q = None
-        else:
+        try:
+            types_set = normalize_types(q.get("types", None))
+        except ValueError:
             return jsonify({"error": "Invalid types"}), 400
 
-        norm_queries.append((name_q, types_q))
+        norm_queries.append((name_q, types_set))
 
-    # pagination
     try:
         offset = int(request.args.get("offset", 0))
     except Exception:
         offset = 0
     if offset < 0:
         offset = 0
-
     page_size = 10
 
-    results: typing.List[dict] = []
+    results = []
     seen_ids = set()
 
-    # Iterate and match if ANY query matches (OR across queries)
-    for artifact_id, artifact in (registry or {}).items():
+    for artifact_id, artifact in registry.items():
         meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
-        name = str(meta.get("name", "")).strip() if isinstance(meta, dict) else ""
+        a_name = str(meta.get("name", "")).strip() if isinstance(meta, dict) else ""
         a_type = str(meta.get("type", "")).strip().lower() if isinstance(meta, dict) else ""
 
-        for (name_q, types_q) in norm_queries:
-            # name filter: exact match unless "*"
-            if name_q != "*" and name.lower() != name_q.lower():
+        matched = False
+        for (name_q, types_set) in norm_queries:
+            if name_q != "*" and a_name.lower() != name_q.lower():
                 continue
 
-            # types filter: optional
-            if types_q is not None and a_type not in types_q:
+            if types_set is not None and a_type not in types_set:
                 continue
 
-            if artifact_id not in seen_ids:
-                results.append(serialize_artifact(artifact_id, artifact))
-                seen_ids.add(artifact_id)
+            matched = True
             break
 
-    # Guard if too many artifacts
+        if not matched:
+            continue
+
+        if artifact_id not in seen_ids:
+            results.append({
+                "name": a_name,
+                "id": str(artifact_id),
+                "type": str(meta.get("type", "")) if isinstance(meta, dict) else "",
+            })
+            seen_ids.add(artifact_id)
+
     if len(results) > 100:
         return jsonify({"error": "Too many artifacts returned"}), 413
 
     paginated = results[offset: offset + page_size]
     next_offset = offset + len(paginated)
 
-    response = jsonify(paginated)
-    response.headers["offset"] = str(next_offset)
-    return response, 200
-
+    resp = jsonify(paginated)
+    resp.headers["offset"] = str(next_offset)
+    return resp, 200
 
 @retrieve_bp.route("/artifact/byName/<name>", methods=["GET"], strict_slashes=False)
 def get_name(name: str):
