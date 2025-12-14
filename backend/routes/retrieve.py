@@ -88,7 +88,7 @@ def get_artifacts():
         name_q = name_q.strip()
 
         raw_types = q.get("types", None)
-        if raw_types is None:
+        if raw_types is None or (isinstance(raw_types, list) and len(raw_types) == 0):
             raw_types = q.get("type", None) 
 
         try:
@@ -104,7 +104,7 @@ def get_artifacts():
         offset = 0
     if offset < 0:
         offset = 0
-    page_size = 10
+    page_size = 30
 
     results = []
     seen_ids = set()
