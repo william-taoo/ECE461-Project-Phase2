@@ -82,7 +82,7 @@ def register_artifact(artifact_type: str):
         total_size = get_artifact_size(url, artifact_type)
     except Exception as e:
         current_app.logger.warning("Failed to compute artifact size for %s: %s", url, e)
-        total_size = 0
+    total_size = 0
 
     if total_size > 5 * 1024**3:
         return jsonify({"error": "Artifact is too large"}), 424
