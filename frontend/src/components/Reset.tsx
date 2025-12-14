@@ -28,6 +28,7 @@ const Reset: React.FC = () => {
         <Button
             variant="danger"
             onClick={handleReset}
+            data-testid="reset-button"
         >
             Reset Registry
         </Button>

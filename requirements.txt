@@ -25,3 +25,5 @@ multidict
 yarl
 aiohttp
 zipstream-new
+selenium
+webdriver-manager

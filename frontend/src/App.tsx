@@ -12,7 +12,10 @@ function App() {
         <div className="min-h-screen flex flex-col items-center bg-gray-300 px-6 py-8">
             {/* <h1 className="text-4xl font-bold text-gray-800 text-center mb-8">Registry Dashboard</h1> */}
             <div className="w-full relative mb-8">
-                <h1 className="text-4xl font-bold text-center text-gray-800 w-full">
+                <h1 
+                    className="text-4xl font-bold text-center text-gray-800 w-full"
+                    data-testid="dashboard-title"
+                >
                     Registry Dashboard
                 </h1>
 
@@ -26,10 +29,8 @@ function App() {
                 <Health />
                 <Artifacts onResult={setResult} />
             </div>
-                <ResultPanel result={result} />
-            <div>
-
-            </div>
+                
+            <ResultPanel result={result} />
         </div>
     );
 }
