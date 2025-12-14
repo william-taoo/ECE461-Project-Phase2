@@ -26,6 +26,7 @@ def serialize_artifact(artifact_id: str, artifact: dict) -> dict:
         "name": metadata.get("name", "") if isinstance(metadata, dict) else "",
         "id": str(artifact_id),
         "type": metadata.get("type", "") if isinstance(metadata, dict) else "",
+        "version": metadata.get("version", "") if isinstance(metadata, dict) else "",
         
         # keep original metadata object (empty dict if missing)
         "metadata": metadata if isinstance(metadata, dict) else {}
@@ -124,11 +125,7 @@ def get_artifacts():
             continue
 
         if artifact_id not in seen_ids:
-            results.append({
-                "name": a_name,
-                "id": str(artifact_id),
-                "type": str(meta.get("type", "")) if isinstance(meta, dict) else "",
-            })
+            results.append(serialize_artifact(artifact_id, artifact))
             seen_ids.add(artifact_id)
 
     if len(results) > 100:
