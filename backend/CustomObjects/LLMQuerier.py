@@ -11,7 +11,7 @@ class LLMQuerier:
         }
 
 
-    def query(self, prompt, model="gpt-oss:120b"):
+    def query(self, prompt, model="llama4:latest"):
         """
         Query the LLM with a prompt
         Return the response.
