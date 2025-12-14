@@ -26,13 +26,24 @@ rate_bp = Blueprint("rate", __name__)
 ENV = os.getenv("ENVIRONMENT", "local")
 
 STOPWORDS = {
-    "https", "http", "www", "com", "org", "github", "huggingface",
-    "repo", "model", "models", "tree", "main"
+    "https", "http", "www", "com", "org",
+    "github", "huggingface",
+    "repo", "model", "models",
+    "dataset", "datasets",
+    "tree", "main", "co"
 }
 
 
 def normalize_token(token: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", token.lower())
+    token = token.lower()
+
+    # Remove non-alphanumeric characters
+    token = re.sub(r"[^a-z0-9]+", "", token)
+
+    # Strip leading and trailing digits ONLY
+    token = re.sub(r"^\d+|\d+$", "", token)
+
+    return token
 
 
 def tokenize(text: str) -> Set[str]:
