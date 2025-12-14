@@ -48,51 +48,78 @@ def get_artifacts():
 
     # parse JSON safely (handle single element list) 
     query = request.get_json(force=True, silent=True)
-    if isinstance(query, list) and len(query) == 1:
-        query = query[0]
-
-    if not query or not isinstance(query, dict):
+    if isinstance(query, dict):
+        queries = [query]
+    elif isinstance(query, list):
+        queries = query
+    else:
+        return jsonify({"error": "Invalid request format"}), 400
+    
+    if not queries:
         return jsonify({"error": "Invalid request format"}), 400
 
-    # query parameters
-    name_query = str(query.get("name", "*")).strip()
-    type_query = str(query.get("type", "all")).strip().lower()
-    version_query = str(query.get("version", "")).strip()
+    norm_queries = []
+    for q in queries:
+        if not isinstance(q, dict):
+            return jsonify({"error": "Invalid request format"}), 400
 
+        name_q = q.get("name", None)
+        if not isinstance(name_q, str) or not name_q.strip():
+            return jsonify({"error": "Missing or invalid name"}), 400
+        name_q = name_q.strip()
+
+        # Spec uses "types" (plural). Keep legacy "type" as fallback.
+        types_raw = q.get("types", None)
+        if types_raw is None:
+            types_raw = q.get("type", None)
+
+        if types_raw is None:
+            types_q = None  # None => match all
+        elif isinstance(types_raw, str):
+            types_q = {types_raw.strip().lower()} if types_raw.strip() else None
+        elif isinstance(types_raw, list):
+            types_q = {str(t).strip().lower() for t in types_raw if str(t).strip()}
+            if not types_q:
+                types_q = None
+        else:
+            return jsonify({"error": "Invalid types"}), 400
+
+        norm_queries.append((name_q, types_q))
+
+    # pagination
     try:
         offset = int(request.args.get("offset", 0))
     except Exception:
         offset = 0
+    if offset < 0:
+        offset = 0
+
     page_size = 10
 
     results: typing.List[dict] = []
+    seen_ids = set()
 
-    # iterate items so we have artifact_id and artifact object
-    for artifact_id, artifact in registry.items():
+    # Iterate and match if ANY query matches (OR across queries)
+    for artifact_id, artifact in (registry or {}).items():
         meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
-        name = str(meta.get("name", "")) if isinstance(meta, dict) else ""
-        a_type = str(meta.get("type", "")).lower() if isinstance(meta, dict) else ""
-        version = str(meta.get("version", "")) if isinstance(meta, dict) else ""
+        name = str(meta.get("name", "")).strip() if isinstance(meta, dict) else ""
+        a_type = str(meta.get("type", "")).strip().lower() if isinstance(meta, dict) else ""
 
-        # name filter
-        if name_query != "*" and name_query.lower() != name.lower():
-            continue
-
-        # type filter
-        if type_query != "all" and a_type != type_query:
-            continue
-
-        # version filter (supports wildcard)
-        if version_query:
-            if "*" in version_query:
-                if not fnmatch.fnmatch(version, version_query):
-                    continue
-            elif version_query != version:
+        for (name_q, types_q) in norm_queries:
+            # name filter: exact match unless "*"
+            if name_q != "*" and name.lower() != name_q.lower():
                 continue
 
-        results.append(serialize_artifact(artifact_id, artifact))
+            # types filter: optional
+            if types_q is not None and a_type not in types_q:
+                continue
 
-    # limit guard if too many artifacts are returned
+            if artifact_id not in seen_ids:
+                results.append(serialize_artifact(artifact_id, artifact))
+                seen_ids.add(artifact_id)
+            break
+
+    # Guard if too many artifacts
     if len(results) > 100:
         return jsonify({"error": "Too many artifacts returned"}), 413
 
