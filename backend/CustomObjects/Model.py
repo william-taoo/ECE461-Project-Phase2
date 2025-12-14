@@ -327,7 +327,7 @@ class Model:
             commits = list_repo_commits(repo_id=repo_id)
 
             # Define the time window (last 365 days)
-            years = 2.5
+            years = 1.0
             year_limit = datetime.now().astimezone() - timedelta(days=365*years)
 
             # Filter commits from the last year and get author names
