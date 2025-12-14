@@ -6,8 +6,9 @@ from utils.registry_utils import (
     add_to_audit
 )
 from utils.time_utils import ms_to_seconds
-import requests
 import os
+from urllib.parse import urlparse
+import re
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -23,21 +24,93 @@ except Exception as e:
 rate_bp = Blueprint("rate", __name__)
 ENV = os.getenv("ENVIRONMENT", "local")
 
+STOPWORDS = {
+    "https", "http", "www", "com", "org", "github", "huggingface",
+    "repo", "model", "models", "tree", "main"
+}
 
-def find_associated_artifact(registry, model_name, artifact_type):
-    """Find dataset/code artifact in registry roughly matching model name."""
-    if not model_name:
-        return None
-    model_name_lower = model_name.lower()
+
+def normalize_token(token: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", token.lower())
+
+
+def tokenize(text: str) -> set[str]:
+    if not text:
+        return set()
+    tokens = re.split(r"[\/\-_\.]+", text.lower())
+    return {
+        normalize_token(t)
+        for t in tokens
+        if t and normalize_token(t) and normalize_token(t) not in STOPWORDS
+    }
+
+
+def has_token_match(model_fp: dict, artifact_fp: dict) -> bool:
+    """
+    Returns True if there is at least one shared non-stopword token
+    between model and artifact.
+    """
+    model_tokens = model_fp["name_tokens"] | model_fp["url_tokens"]
+    artifact_tokens = artifact_fp["name_tokens"] | artifact_fp["url_tokens"]
+
+    return len(model_tokens & artifact_tokens) > 0
+
+
+def extract_hf_repo_id(url: str) -> str | None:
+    try:
+        parsed = urlparse(url)
+        if "huggingface.co" not in parsed.netloc:
+            return None
+        parts = parsed.path.strip("/").split("/")
+        if len(parts) >= 2:
+            return f"{parts[0].lower()}/{parts[1].lower()}"
+    except Exception:
+        pass
+    return None
+
+
+def extract_github_repo_id(url: str) -> str | None:
+    try:
+        parsed = urlparse(url)
+        if "github.com" not in parsed.netloc:
+            return None
+        parts = parsed.path.strip("/").split("/")
+        if len(parts) >= 2:
+            return f"{parts[0].lower()}/{parts[1].lower()}"
+    except Exception:
+        pass
+    return None
+
+
+def artifact_fingerprint(entry: dict) -> dict:
+    meta = entry.get("metadata", {})
+    data = entry.get("data", {})
+
+    url = (data.get("url") or "").strip()
+    name = (meta.get("name") or "").strip()
+
+    return {
+        "name_tokens": tokenize(name),
+        "url_tokens": tokenize(url),
+        "hf_id": extract_hf_repo_id(url),
+        "gh_id": extract_github_repo_id(url),
+    }
+
+
+def find_associated_artifact(registry, model_entry, artifact_type):
+    model_fp = artifact_fingerprint(model_entry)
+
     for artifact_id, artifact in registry.items():
         meta = artifact.get("metadata", {})
-        data = artifact.get("data", {})
         if meta.get("type") != artifact_type:
             continue
-        name_lower = (meta.get("name") or "").lower()
-        url_lower = (data.get("url") or "").lower()
-        if model_name_lower in name_lower or model_name_lower in url_lower or name_lower in model_name_lower:
+
+        artifact_fp = artifact_fingerprint(artifact)
+
+        # Automatic match if ANY token overlaps
+        if has_token_match(model_fp, artifact_fp):
             return artifact
+
     return None
 
 
@@ -54,9 +127,6 @@ def rate_model(id):
     - Treescore: Average of the total model scores of all parents
     of the model
     '''
-
-    # ADD LOGIC TO CHECK REGISTRY FOR UPLOADED DATASET AND CODE ASSOCIATED WITH THE MODEL
-    # IF DATASET AND CODE ARE PRESENT, USE THEM IN NET SCORE, OTHERWISE, SCORE WITH JUST MODEL URL
 
     if ModelClass is None:
         return jsonify({"error": "Model implementation unavailable"}), 500
@@ -82,19 +152,15 @@ def rate_model(id):
     data = entry.get("data") or {}
 
     model_url = (data.get("url") or "").strip()
-    dataset_url = (data.get("dataset_url") or metadata.get("dataset_url") or "").strip()
-    code_url = (data.get("code_url") or metadata.get("code_url") or "").strip()
-
+    
     if not model_url:
         return jsonify({"error": "Artifact is missing model url"}), 400
-    
-    model_name = metadata.get("name") or ""
-
+ 
     # Look for associated dataset and code
-    dataset_entry = find_associated_artifact(registry, model_name, "dataset")
+    dataset_entry = find_associated_artifact(registry, entry, "dataset")
     dataset_url = (dataset_entry.get("data", {}).get("url") or "").strip() if dataset_entry else ""
 
-    code_entry = find_associated_artifact(registry, model_name, "code")
+    code_entry = find_associated_artifact(registry, entry, "code")
     code_url = (code_entry.get("data", {}).get("url") or "").strip() if code_entry else ""
 
     # Now create model with proper URLs
@@ -173,5 +239,3 @@ def rate_model(id):
     # add_to_audit(name, admin, artifact_type, id, artifact_name, "RATE")
 
     return jsonify(response), 200
-    
-    
