@@ -70,41 +70,58 @@ def register_artifact(artifact_type: str):
     try:
         detected = infer_artifact_type(url)
         if detected != artifact_type:
-            return (
-                jsonify(
-                    {
-                        "error": f"URL looks like {detected}, not {artifact_type}"
-                    }
-                ),
-                400,
-            )
+            return jsonify({"error": f"URL looks like {detected}, not {artifact_type}"}), 400
     except ValueError:
         pass
 
-    for entry in (
-        registry.values() if isinstance(registry, dict) else registry
-    ):
-        if entry.get("data", {}).get("url") == url:
-            return (
-                jsonify({"error": "Artifact with this URL already exists"}),
-                409,
-            )
-
-    total_size = get_artifact_size(url, artifact_type)
+    for entry0 in (registry.values() if isinstance(registry, dict) else registry):
+        if entry0.get("data", {}).get("url") == url:
+            return jsonify({"error": "Artifact with this URL already exists"}), 409
 
     try:
         total_size = get_artifact_size(url, artifact_type)
     except Exception as e:
-        current_app.logger.warning(
-            "Failed to compute artifact size for %s: %s", url, e
-        )
-    total_size = 0
+        current_app.logger.warning("Failed to compute artifact size for %s: %s", url, e)
+        total_size = 0
 
     if total_size > 5 * 1024**3:
         return jsonify({"error": "Artifact is too large"}), 424
 
+    readme_text = ""
+    try:
+        if "huggingface.co" in url:
+            repo_id = extract_hf_repo_id(url)
+            if repo_id:
+                for branch in ("main", "master"):
+                    for fn in ("README.md", "README.MD", "readme.md", "readme.MD", "README.txt", "README"):
+                        r = requests.get(f"https://huggingface.co/{repo_id}/raw/{branch}/{fn}", timeout=5)
+                        if r.status_code == 200 and r.text.strip():
+                            readme_text = r.text[:200_000]
+                            break
+                    if readme_text:
+                        break
+
+        elif "github.com" in url:
+            parts = urlparse(url).path.strip("/").split("/")
+            if len(parts) >= 2:
+                owner = parts[0]
+                repo = parts[1]
+                if repo.endswith(".git"):
+                    repo = repo[:-4]
+                for branch in ("main", "master"):
+                    r = requests.get(
+                        f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/README.md",
+                        timeout=5,
+                    )
+                    if r.status_code == 200 and r.text.strip():
+                        readme_text = r.text[:200_000]
+                        break
+    except Exception:
+        readme_text = ""
+
     artifact_id = uuid.uuid4().hex
     artifact_name = body.get("name") or os.path.basename(url) or "unnamed"
+
     entry = {
         "metadata": {
             "id": artifact_id,
@@ -113,9 +130,9 @@ def register_artifact(artifact_type: str):
             "type": artifact_type,
         },
         "data": {"url": url},
+        "_index": {"readme": readme_text},
     }
 
-    # temporarily save
     if isinstance(registry, dict):
         registry[artifact_id] = entry
     else:
@@ -138,35 +155,19 @@ def register_artifact(artifact_type: str):
                     save_registry(registry_path, registry)
                 else:
                     save_registry(data=registry)
-                return (
-                    jsonify(
-                        {"error": f"Failed to rate model: {response.text}"}
-                    ),
-                    424,
-                )
+                return jsonify({"error": f"Failed to rate model: {response.text}"}), 424
 
             rating = response.json()
             net_score = rating.get("net_score", 0.0)
 
-            # COME BACK AND SET SCORE THRESHOLD. NEED TO FIX RATING LOGIC IN MODEL.PY
-            # TO HANDLE DIFFERENT HF URL FORMATS
             if net_score < -1:
-                # reject artifact
                 del registry[artifact_id]
                 if ENV == "local":
                     save_registry(registry_path, registry)
                 else:
                     save_registry(data=registry)
-                return (
-                    jsonify(
-                        {
-                            "error": f"Model rejected. Score too low: ({net_score}). Upload failed."
-                        }
-                    ),
-                    424,
-                )
+                return jsonify({"error": f"Model rejected. Score too low: ({net_score}). Upload failed."}), 424
 
-            # save rating in artifact entry
             final_entry = {
                 "metadata": {
                     "id": artifact_id,
@@ -176,6 +177,7 @@ def register_artifact(artifact_type: str):
                     "rating": rating,
                 },
                 "data": {"url": url},
+                "_index": entry.get("_index", {}),
             }
 
             if isinstance(registry, dict):
@@ -187,20 +189,20 @@ def register_artifact(artifact_type: str):
                 save_registry(registry_path, registry)
             else:
                 save_registry(data=registry)
-        
+
+            entry = final_entry
+
         except Exception as e:
             del registry[artifact_id]
-
             if ENV == "local":
                 save_registry(registry_path, registry)
             else:
                 save_registry(data=registry)
-
             return jsonify({"error": f"Failed to rate model: {e}"}), 424
 
     # download the artifact
     try:
-        # create stable S3 key 
+        # create stable S3 key
         if artifact_type == "model" and "huggingface.co" in url:
             repo_id = extract_hf_repo_id(url)
             if not repo_id:
@@ -208,62 +210,25 @@ def register_artifact(artifact_type: str):
             safe_name = repo_id.replace("/", "_")
             s3_key = f"artifacts/models/{safe_name}.zip"
         else:
-            # For code/dataset, use artifact_name
             safe_name = artifact_name.replace("/", "_")
             s3_key = f"artifacts/{artifact_type}/{safe_name}.zip"
 
-        # check if zip already exists in S3
         if s3_object_exists(S3_BUCKET, s3_key):
-            current_app.logger.info(
-                f"S3 object already exists, skipping upload: {s3_key}"
-            )
-
+            current_app.logger.info(f"S3 object already exists, skipping upload: {s3_key}")
             presigned_url = make_presigned_url(s3_key)
             entry["data"]["download_url"] = presigned_url
             entry["data"]["s3_key"] = s3_key
-
         else:
             try:
-                # # Hugging Face model — download ONLY weights
-                # if artifact_type == "model" and "huggingface.co" in url:
-                #     repo_id = extract_hf_repo_id(url)
-                #     if not repo_id:
-                #         raise Exception("Invalid HuggingFace URL")
-
-                #     # download ONLY the weight files
-                #     zip_stream = stream_zip_of_hf_repo(repo_id, component="weights")
-
-                #     upload_zip_stream_to_s3(zip_stream, s3_key)
-
-                # # Code or dataset -> upload a real placeholder zip
-                # else:
-                #     z_real = zipstream.ZipFile(
-                #         mode="w", compression=zipstream.ZIP_DEFLATED
-                #     )
-                #     z_real.write_iter(
-                #         "real_placeholder.txt", iter([b"real content"])
-                #     )
-                #     upload_zip_stream_to_s3(z_real, s3_key)
-
-                z_real = zipstream.ZipFile(
-                        mode="w", compression=zipstream.ZIP_DEFLATED)
-                z_real.write_iter(
-                        "real_placeholder.txt", iter([b"real content"]))
+                z_real = zipstream.ZipFile(mode="w", compression=zipstream.ZIP_DEFLATED)
+                z_real.write_iter("real_placeholder.txt", iter([b"real content"]))
                 upload_zip_stream_to_s3(z_real, s3_key)
-
             except Exception as zip_err:
-                # fallback empty ZIP
-                current_app.logger.warning(
-                    f"Real ZIP failed, falling back to empty ZIP: {zip_err}"
-                )
-
-                z_empty = zipstream.ZipFile(
-                    mode="w", compression=zipstream.ZIP_DEFLATED
-                )
+                current_app.logger.warning(f"Real ZIP failed, falling back to empty ZIP: {zip_err}")
+                z_empty = zipstream.ZipFile(mode="w", compression=zipstream.ZIP_DEFLATED)
                 z_empty.write_iter("placeholder.txt", iter([b""]))
                 upload_zip_stream_to_s3(z_empty, s3_key)
 
-            # after successful upload (real or empty), generate S3 URL
             presigned_url = make_presigned_url(s3_key)
             entry["data"]["download_url"] = presigned_url
             entry["data"]["s3_key"] = s3_key
@@ -280,14 +245,8 @@ def register_artifact(artifact_type: str):
             save_registry(data=registry)
 
     except Exception as e:
-        return jsonify({
-            "error": "Failed to download and package artifact",
-            "details": str(e),
-        }), 500
+        return jsonify({"error": "Failed to download and package artifact", "details": str(e)}), 500
 
-    # # Add to audit
-    # name = "Name" # Change this later
-    # admin = False # Change this later
-    # add_to_audit(name, admin, artifact_type, artifact_id, artifact_name, "CREATE")
-
-    return jsonify(entry), 201
+    resp_entry = dict(entry)
+    resp_entry.pop("_index", None)
+    return jsonify(resp_entry), 201

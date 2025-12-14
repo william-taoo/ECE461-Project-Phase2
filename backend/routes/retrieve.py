@@ -369,14 +369,14 @@ def get_by_regex():
     """
     data = request.get_json(force=True, silent=True)
     if not data or "regex" not in data:
-        return jsonify({"error": "Missing regex"}), 400
+        return jsonify({"error": "Invalid regular expression"}), 400
 
     pattern = data["regex"]
     if not isinstance(pattern, str):
         return jsonify({"error": "Invalid regex type"}), 400
 
     try:
-        compiled_regex = re.compile(pattern, re.IGNORECASE)
+        compiled_regex = re.compile(pattern, re.IGNORECASE | re.DOTALL)
     except re.error:
         return jsonify({"error": "Invalid regular expression"}), 400
 
@@ -391,8 +391,17 @@ def get_by_regex():
     for artifact_id, artifact in registry.items():
         metadata = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
         name = str(metadata.get("name", ""))
-        if compiled_regex.search(name):
-            matches.append(serialize_artifact(artifact_id, artifact))
+        readme = ""
+        if isinstance(artifact, dict):
+            idx = artifact.get("_index")
+            if isinstance(idx, dict):
+                readme = idx.get("readme") or ""
+        if compiled_regex.search(name) or (readme and compiled_regex.search(readme)):
+            matches.append({
+                "name": str(metadata.get("name", "")),
+                "id": str(metadata.get("id") or artifact_id),
+                "type": str(metadata.get("type", "")),
+            })
 
     if not matches:
         return jsonify({"error": "No artifacts found"}), 404
