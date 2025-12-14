@@ -89,58 +89,75 @@ def artifact_fingerprint(entry: dict) -> dict:
 
     url = (data.get("url") or "").strip()
     name = (meta.get("name") or "").strip()
+    artifact_id = entry.get("id") or (meta.get("id") or "unknown_id") # <-- ADDED ID
 
     return {
+        "id": artifact_id, # <-- NEW
         "name_tokens": tokenize(name),
         "url_tokens": tokenize(url),
         "hf_id": extract_hf_repo_id(url),
         "gh_id": extract_github_repo_id(url),
+        "entry": entry 
     }
 
+def calculate_jaccard_similarity(set_a: Set[str], set_b: Set[str]) -> float:
+    """Calculates intersection over union for two sets of tokens."""
+    if not set_a or not set_b:
+        return 0.0
+    intersection = len(set_a & set_b)
+    union = len(set_a | set_b)
+    return intersection / union if union > 0 else 0.0
 
 def find_associated_artifact(registry, model_entry, artifact_type):
     model_fp = artifact_fingerprint(model_entry)
+    model_tokens = model_fp["name_tokens"] | model_fp["url_tokens"]
+    
+    candidates = []
 
     for artifact_id, artifact in registry.items():
         meta = artifact.get("metadata", {})
         if meta.get("type") != artifact_type:
             continue
-
+        
         artifact_fp = artifact_fingerprint(artifact)
-
-        # Automatic match if ANY token overlaps
-        if has_token_match(model_fp, artifact_fp):
+        
+        # 1. Exact Match on Canonical ID (HF or GH)
+        if model_fp["hf_id"] and artifact_fp["hf_id"] and model_fp["hf_id"] == artifact_fp["hf_id"]:
+            return artifact
+            
+        if model_fp["gh_id"] and artifact_fp["gh_id"] and model_fp["gh_id"] == artifact_fp["gh_id"]:
             return artifact
 
-    return None
+        # 2. Token/Jaccard Similarity Fallback
+        artifact_tokens = artifact_fp["name_tokens"] | artifact_fp["url_tokens"]
+        if not artifact_tokens:
+            continue
+            
+        score = calculate_jaccard_similarity(model_tokens, artifact_tokens)
+        if score > 0:
+            candidates.append((score, artifact))
 
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    
+    if candidates:
+        best_score, best_artifact = candidates[0]
+        return best_artifact
+
+    return None
 
 @rate_bp.route("/artifact/model/<id>/rate", methods=["GET"])
 def rate_model(id):
     '''
-    Rate the model and return the net and sub scores
-    from phase 1
-    Also includes new metrics
-    - Reproducibility: Whether model can be run using only 
-    the demonstrated code in model card
-    - Reviewedness: The fraction of all code in repo that was 
-    introduced by pull requests with a code review
-    - Treescore: Average of the total model scores of all parents
-    of the model
+    Rate the model and return the net and sub scores.
     '''
 
-    if ModelClass is None:
-        return jsonify({"error": "Model implementation unavailable"}), 500
-    if CodeClass is None:
-        return jsonify({"error": "Code implementation unavailable"}), 500
-    if DatasetClass is None:
-        return jsonify({"error": "Model implementation unavailable"}), 500
+    if ModelClass is None or CodeClass is None or DatasetClass is None:
+        return jsonify({"error": "One or more core Model, Code, or Dataset implementations are unavailable."}), 500
 
     if ENV == "local":
         registry_path = current_app.config.get("REGISTRY_PATH")
         if not registry_path:
             return jsonify({"error": "Server misconfigured: REGISTRY_PATH unset"}), 500
-
         registry = load_registry(registry_path)
     else:
         registry = load_registry()
@@ -149,8 +166,8 @@ def rate_model(id):
     if not entry:
         return jsonify({"error": "Artifact does not exist."}), 404
     
-    metadata = entry.get("metadata") or {}
-    data = entry.get("data") or {}
+    metadata = entry.get("metadata", {})
+    data = entry.get("data", {})
 
     model_url = (data.get("url") or "").strip()
     
@@ -172,8 +189,11 @@ def rate_model(id):
     try:
         model.compute_net_score(api_key=api_key)
     except Exception as e:
+        # Log the error for debugging on the server side
+        current_app.logger.error(f"Error computing net score for {id}: {e}")
         return jsonify({"error": f"Failed to compute net score: {e}"}), 500
     
+    # Sanitize and extract size scores
     size_score = getattr(model, "size_score", {}) or {}
     size_score = {
         "raspberry_pi": float(size_score.get("raspberry_pi", 0.0)),
@@ -210,11 +230,10 @@ def rate_model(id):
         "code_quality": float(getattr(getattr(model, "code", object()), "quality", 0.0)),
         "code_quality_latency": ms_to_seconds(getattr(model, "code_quality_latency", 0)),
 
-        # New metrics (already computed inside Model.py)
         "reproducibility": float(getattr(model, "reproducibility", 0.0)),
         "reproducibility_latency": ms_to_seconds(getattr(model, "reproducibility_latency", 0)),
 
-        "reviewedness": float(getattr(model, "reviewedness", 0.0)),  # may be -1.0 if unknown
+        "reviewedness": float(getattr(model, "reviewedness", 0.0)), 
         "reviewedness_latency": ms_to_seconds(getattr(model, "reviewedness_latency", 0)),
 
         "tree_score": float(getattr(model, "treescore", 0.0)),
@@ -232,7 +251,7 @@ def rate_model(id):
     else:
         save_registry(data=registry)
 
-    # # Add to audit
+    # Add to audit
     # name = "Name" # Change this later
     # admin = False # Change this later
     # artifact_type = data["metadata"]["type"]
