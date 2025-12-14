@@ -26,74 +26,35 @@ rate_bp = Blueprint("rate", __name__)
 ENV = os.getenv("ENVIRONMENT", "local")
 
 STOPWORDS = {
-    "https", "http", "www", "com", "org",
-    "github", "huggingface",
-    "repo", "model", "models",
-    "dataset", "datasets",
-    "tree", "main", "co"
+    "https", "http", "www", "com", "org", "github", "huggingface",
+    "repo", "model", "models", "tree", "main", "co"
 }
 
 
 def normalize_token(token: str) -> str:
-    token = token.lower()
-
-    # Remove non-alphanumeric characters
-    token = re.sub(r"[^a-z0-9]+", "", token)
-
-    # Strip leading and trailing digits ONLY
-    token = re.sub(r"^\d+|\d+$", "", token)
-
-    return token
+    return re.sub(r"[^a-z]+", "", token.lower())
 
 
 def tokenize(text: str) -> Set[str]:
     if not text:
         return set()
-
-    raw = re.split(r"[\/\.]+", text.lower())
-    tokens = set()
-
-    for chunk in raw:
-        parts = chunk.split("-")
-        if len(parts) > 1:
-            tokens.add(normalize_token("-".join(parts)))
-        for p in parts:
-            nt = normalize_token(p)
-            if nt and nt not in STOPWORDS:
-                tokens.add(nt)
-
-    return tokens
+    tokens = re.split(r"[\/\-_\.]+", text.lower())
+    return {
+        normalize_token(t)
+        for t in tokens
+        if t and normalize_token(t) and normalize_token(t) not in STOPWORDS
+    }
 
 
-def has_token_match(model_fp, artifact_fp) -> bool:
+def has_token_match(model_fp: dict, artifact_fp: dict) -> bool:
+    """
+    Returns True if there is at least one shared non-stopword token
+    between model and artifact.
+    """
     model_tokens = model_fp["name_tokens"] | model_fp["url_tokens"]
     artifact_tokens = artifact_fp["name_tokens"] | artifact_fp["url_tokens"]
 
-    overlap = model_tokens & artifact_tokens
-
-    # Require at least 1 non-trivial token
-    return any(len(tok) >= 4 for tok in overlap)
-
-
-def split_hf_repo(parts):
-    NON_REPO_SEGMENTS = {"blob", "resolve", "tree", "viewer", "raw"}
-    if len(parts) == 1:
-        repo = parts[0]
-        return None, repo, repo
-    if parts[0] == "datasets":
-        if len(parts) == 2:
-            repo = parts[1]
-            return None, repo, repo
-        elif len(parts) >= 3:
-            second, third = parts[1], parts[2]
-            if third in NON_REPO_SEGMENTS:
-                repo = second
-                return None, repo, repo
-            else:
-                owner, repo = second, third
-                return owner, repo, f"{owner}/{repo}"
-    owner, repo = parts[0], parts[1]
-    return owner, repo, f"{owner}/{repo}"
+    return len(model_tokens & artifact_tokens) > 0
 
 
 def extract_hf_repo_id(url: str) -> Optional[str]:
@@ -102,23 +63,24 @@ def extract_hf_repo_id(url: str) -> Optional[str]:
         if "huggingface.co" not in parsed.netloc:
             return None
         parts = parsed.path.strip("/").split("/")
-        _, _, repo_id = split_hf_repo(parts)
-        return repo_id
+        if len(parts) >= 2:
+            return f"{parts[0].lower()}/{parts[1].lower()}"
     except Exception:
-        return None
+        pass
+    return None
 
 
 def extract_github_repo_id(url: str) -> Optional[str]:
     try:
-        url = url.replace(".git", "")
-        parsed = urlparse(url.replace("git@", "").replace("github.com:", "github.com/"))
+        parsed = urlparse(url)
         if "github.com" not in parsed.netloc:
             return None
         parts = parsed.path.strip("/").split("/")
         if len(parts) >= 2:
             return f"{parts[0].lower()}/{parts[1].lower()}"
     except Exception:
-        return None
+        pass
+    return None
 
 
 def artifact_fingerprint(entry: dict) -> dict:
