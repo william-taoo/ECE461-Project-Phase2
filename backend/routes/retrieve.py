@@ -87,8 +87,12 @@ def get_artifacts():
             return jsonify({"error": "Missing or invalid name"}), 400
         name_q = name_q.strip()
 
+        raw_types = q.get("types", None)
+        if raw_types is None:
+            raw_types = q.get("type", None) 
+
         try:
-            types_set = normalize_types(q.get("types", None))
+            types_set = normalize_types(raw_types)
         except ValueError:
             return jsonify({"error": "Invalid types"}), 400
 
