@@ -33,6 +33,8 @@ def extract_hf_repo_id(url: str) -> t.Optional[str]:
         path = urlparse(url).path.strip("/")
         parts = path.split("/")
         if len(parts) < 2:
+            if len(parts) == 1:
+                return parts[0]
             return None
         return "/".join(parts[:2])
     except Exception:
