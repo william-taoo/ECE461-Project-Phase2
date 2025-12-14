@@ -36,7 +36,7 @@ def find_associated_artifact(registry, model_name, artifact_type):
             continue
         name_lower = (meta.get("name") or "").lower()
         url_lower = (data.get("url") or "").lower()
-        if model_name_lower in name_lower or model_name_lower in url_lower:
+        if model_name_lower in name_lower or model_name_lower in url_lower or name_lower in model_name_lower:
             return artifact
     return None
 
