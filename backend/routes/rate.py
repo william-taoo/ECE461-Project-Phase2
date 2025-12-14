@@ -9,6 +9,7 @@ from utils.time_utils import ms_to_seconds
 import os
 from urllib.parse import urlparse
 import re
+from typing import Optional, Set
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -34,7 +35,7 @@ def normalize_token(token: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", token.lower())
 
 
-def tokenize(text: str) -> set[str]:
+def tokenize(text: str) -> Set[str]:
     if not text:
         return set()
     tokens = re.split(r"[\/\-_\.]+", text.lower())
@@ -56,7 +57,7 @@ def has_token_match(model_fp: dict, artifact_fp: dict) -> bool:
     return len(model_tokens & artifact_tokens) > 0
 
 
-def extract_hf_repo_id(url: str) -> str | None:
+def extract_hf_repo_id(url: str) -> Optional[str]:
     try:
         parsed = urlparse(url)
         if "huggingface.co" not in parsed.netloc:
@@ -69,7 +70,7 @@ def extract_hf_repo_id(url: str) -> str | None:
     return None
 
 
-def extract_github_repo_id(url: str) -> str | None:
+def extract_github_repo_id(url: str) -> Optional[str]:
     try:
         parsed = urlparse(url)
         if "github.com" not in parsed.netloc:
