@@ -1,0 +1,67 @@
+[
+    {
+        "user": {
+            "name": "Name",
+            "admin": false
+        },
+        "date": "2025-12-14T18:45:20.689177+00:00Z",
+        "artifact": {
+            "name": "test-model",
+            "id": "test-id-123",
+            "type": "model"
+        },
+        "action": "UPDATE"
+    },
+    {
+        "user": {
+            "name": "Name",
+            "admin": false
+        },
+        "date": "2025-12-14T18:48:56.943478+00:00Z",
+        "artifact": {
+            "name": "test-model",
+            "id": "test-id-123",
+            "type": "model"
+        },
+        "action": "AUDIT"
+    },
+    {
+        "user": {
+            "name": "Name",
+            "admin": false
+        },
+        "date": "2025-12-14T18:48:59.460004+00:00Z",
+        "artifact": {
+            "name": "test-model",
+            "id": "test-id-123",
+            "type": "model"
+        },
+        "action": "UPDATE"
+    },
+    {
+        "user": {
+            "name": "Name",
+            "admin": false
+        },
+        "date": "2025-12-14T18:50:24.804560+00:00Z",
+        "artifact": {
+            "name": "test-model",
+            "id": "test-id-123",
+            "type": "model"
+        },
+        "action": "AUDIT"
+    },
+    {
+        "user": {
+            "name": "Name",
+            "admin": false
+        },
+        "date": "2025-12-14T18:50:25.538267+00:00Z",
+        "artifact": {
+            "name": "test-model",
+            "id": "test-id-123",
+            "type": "model"
+        },
+        "action": "UPDATE"
+    }
+]
