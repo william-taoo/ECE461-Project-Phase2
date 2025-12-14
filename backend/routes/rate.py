@@ -1,3 +1,4 @@
+
 from flask import Blueprint, request, jsonify, current_app
 from utils.registry_utils import (
     load_registry,
@@ -26,24 +27,13 @@ rate_bp = Blueprint("rate", __name__)
 ENV = os.getenv("ENVIRONMENT", "local")
 
 STOPWORDS = {
-    "https", "http", "www", "com", "org",
-    "github", "huggingface",
-    "repo", "model", "models",
-    "dataset", "datasets",
-    "tree", "main", "co"
+    "https", "http", "www", "com", "org", "github", "huggingface",
+    "repo", "model", "models", "tree", "main"
 }
 
 
 def normalize_token(token: str) -> str:
-    token = token.lower()
-
-    # Remove non-alphanumeric characters
-    token = re.sub(r"[^a-z0-9]+", "", token)
-
-    # Strip leading and trailing digits ONLY
-    token = re.sub(r"^\d+|\d+$", "", token)
-
-    return token
+    return re.sub(r"[^a-z0-9]+", "", token.lower())
 
 
 def tokenize(text: str) -> Set[str]:
