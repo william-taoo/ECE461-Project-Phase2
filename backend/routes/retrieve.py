@@ -206,6 +206,9 @@ def get_artifact(artifact_type: str, id: str):
 
     # also include the rest of the artifact payload if present
     full = dict(artifact) if isinstance(artifact, dict) else {}
+    for k in list(full.keys()):
+        if k.startswith("_"):
+            full.pop(k, None)
 
     # overwrite top-level id/name/type/version/metadata with normalized values
     full.update(normalized)
