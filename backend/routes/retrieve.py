@@ -56,11 +56,8 @@ def get_artifacts():
 
     # query parameters
     name_query = str(query.get("name", "*")).strip()
-    raw_type = query.get("type", "all")
-    type_query = str(raw_type).strip().lower() if raw_type else "all"
-
-    version_query = str(query.get("version", "*")).strip()
-
+    type_query = str(query.get("type", "all")).strip().lower()
+    version_query = str(query.get("version", "")).strip()
 
     try:
         offset = int(request.args.get("offset", 0))
@@ -78,13 +75,8 @@ def get_artifacts():
         version = str(meta.get("version", "")) if isinstance(meta, dict) else ""
 
         # name filter
-        if name_query != "*":
-            if "*" in name_query:
-                if not fnmatch.fnmatch(name.lower(), name_query.lower()):
-                    continue
-            else:
-                if name.lower() != name_query.lower():
-                    continue
+        if name_query != "*" and name_query.lower() != name.lower():
+            continue
 
         # type filter
         if type_query != "all" and a_type != type_query:
