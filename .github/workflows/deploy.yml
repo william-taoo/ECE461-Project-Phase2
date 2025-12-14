@@ -59,7 +59,9 @@ jobs:
             script: |
               cd /home/ec2-user/projects/myapp
               echo "API_KEY=${{ secrets.API_KEY }}" > .env
-              cd backend
+              cd backend/CustomObjects
+              echo "GITHUB_TOKEN=${{ secrets.REQUEST_TOKEN }}" > .env
+              cd ..
               echo "RESET_PASSWORD=purduepete" > .env
               echo "ENVIRONMENT=Prod" >> .env
               echo "API_KEY=${{ secrets.API_KEY }}" >> .env
