@@ -65,6 +65,7 @@ jobs:
               echo "RESET_PASSWORD=purduepete" > .env
               echo "ENVIRONMENT=Prod" >> .env
               echo "API_KEY=${{ secrets.API_KEY }}" >> .env
+              echo "GITHUB_TOKEN=${{ secrets.REQUEST_TOKEN }}" >> .env
               sudo systemctl stop myapp || true
               source ../venv/bin/activate
               pip install --upgrade pip
