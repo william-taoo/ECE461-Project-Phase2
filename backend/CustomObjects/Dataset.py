@@ -164,7 +164,8 @@ class Dataset:
         elif popularity_score is not None:
             self.quality = float(popularity_score)
         else:
-            self.quality = 0.0
+            # Dataset exists
+            self.quality = 0.5
 
         # final clamp
         self.quality = max(0.0, min(1.0, self.quality))

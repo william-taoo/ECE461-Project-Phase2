@@ -16,7 +16,7 @@ import tempfile
 import requests
 import networkx as nx
 import json
-import matplotlib.pyplot as plt
+
 
 class Model:
     url: str
@@ -338,24 +338,32 @@ class Model:
                         recent_authors.append(author)
 
             if not recent_authors:
-                return 0.0
+                return 0.5
 
             total_commits = len(recent_authors)
 
             # Count commits per author
             commit_counts = Counter(recent_authors)
 
-            # Identify significant authors (>4% of commits)
-            percent_of_commits = 4.0
+            # Identify significant authors (>2% of commits)
+            percent_of_commits = 2.0
             significant_authors_count = 0
+
             for author, count in commit_counts.items():
                 contribution_percentage = (count / total_commits) * 100
                 if contribution_percentage > percent_of_commits:
                     significant_authors_count += 1
 
-            # Calculate the final score (capped at 1.0)
-            min_total_contributors = 5.0
+            # Base score from significant contributors
+            min_total_contributors = 3.0
             score = min(1.0, significant_authors_count / min_total_contributors)
+
+            # Soft bonus for long tail contributors
+            long_tail = max(0, len(commit_counts) - significant_authors_count)
+            score += min(0.2, long_tail * 0.02)
+
+            score = min(1.0, score)
+
             return score
 
         except Exception as e:

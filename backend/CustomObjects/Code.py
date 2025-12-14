@@ -81,13 +81,13 @@ class Code:
                 # shallow clone for speed
                 repo = git.Repo.clone_from(self.code_url, tmpdir, depth=1, single_branch=True)
             except Exception:
-                self.quality = 0.0
+                self.quality = 0.5
                 return self.quality
 
             try:
                 loc = self.count_python_loc(tmpdir)
                 if loc == 0:
-                    self.quality = 0.0
+                    self.quality = 0.5  # code exists, but not python
                     return self.quality
 
                 error_count = self.run_flake8(tmpdir)
@@ -108,9 +108,10 @@ class Code:
                 else:
                     multiplier = 100 # Lenient for very large projects
 
-                score = max(0.0, 1.0 - (loc / (error_count * multiplier)))
+                error_density = error_count / max(1, loc)
+                score = 1.0 - error_density * multiplier
 
-                self.quality = float(score)
+                self.quality = float(max(0.0, min(1.0, score)))
                 return self.quality
 
             finally:
