@@ -1,11 +1,11 @@
 from flask import Blueprint, request, jsonify, current_app
-from registry_utils import (
+from utils.registry_utils import (
     load_registry,
     save_registry,
     find_model_in_registry,
     add_to_audit
 )
-from time_utils import ms_to_seconds
+from utils.time_utils import ms_to_seconds
 import os
 from urllib.parse import urlparse
 import re
