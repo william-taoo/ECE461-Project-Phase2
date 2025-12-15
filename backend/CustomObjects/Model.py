@@ -124,8 +124,8 @@ class Model:
             A dictionary mapping device names to their size scores.
         """
         thresholds: Dict[str, int] = {
-            'raspberry_pi': 1 * 1024**3,  # 1 GB
-            'jetson_nano': 2 * 1024**3,   # 2 GB
+            'raspberry_pi': 4 * 1024**3,  # 1 GB
+            'jetson_nano': 8 * 1024**3,   # 2 GB
             'desktop_pc': 16 * 1024**3,   # 16 GB
             'aws_server': float('inf')    # no limit
         }

@@ -92,21 +92,21 @@ class Code:
 
                 error_count = self.run_flake8(tmpdir)
 
-                if error_count == 0:
-                    self.quality = 1.0
+                if error_count < 50:
+                    self.quality = 0.9
                     return self.quality
 
                 # Dynamic penalty multiplier based on project size:
                 # The penalty multiplier changes based on the total lines of code.
                 # Smaller projects are penalized more heavily for each error.
                 if loc < 500:
-                    multiplier = 5   # Very strict for small scripts
+                    multiplier = 2 
                 elif loc < 5000:
-                    multiplier = 20  # Moderately strict for small projects
+                    multiplier = 10
                 elif loc < 20000:
-                    multiplier = 50  # Less strict for medium projects
+                    multiplier = 25
                 else:
-                    multiplier = 100 # Lenient for very large projects
+                    multiplier = 50
 
                 error_density = error_count / max(1, loc)
                 score = 1.0 - error_density * multiplier
